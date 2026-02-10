@@ -177,23 +177,10 @@ func main() {
 			var activeContainers int64
 			db.Model(&models.Deployment{}).Where("status = ? AND container_id != ''", models.StatusReady).Count(&activeContainers)
 
-			domain := os.Getenv("ORCHESTRO_DOMAIN")
-			if domain == "" {
-				domain = "localhost:8080"
-			}
-
-			// Construct base URL for webhooks
-			webhookBase := os.Getenv("ORCHESTRO_WEBHOOK_URL")
-			if webhookBase == "" {
-				webhookBase = "http://" + domain + "/api/v1/webhooks"
-			}
-
 			c.JSON(200, gin.H{
 				"total_projects":    projectCount,
 				"total_deployments": deploymentCount,
 				"active_containers": activeContainers,
-				"domain":            domain,
-				"webhook_base":      webhookBase,
 			})
 		})
 
