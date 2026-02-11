@@ -19,19 +19,16 @@ import (
 )
 
 func main() {
-	// Initialize Database
 	db, err := gorm.Open(sqlite.Open("orchestro.db"), &gorm.Config{})
 	if err != nil {
 		log.Fatalf("failed to connect database: %v", err)
 	}
 
-		// Auto Migrate
 	err = db.AutoMigrate(&models.Project{}, &models.EnvVar{}, &models.Deployment{}, &models.Backup{}, &models.Volume{})
 	if err != nil {
 		log.Fatalf("failed to migrate database: %v", err)
 	}
 
-	// Initialize Orchestrator
 	orch, err := orchestrator.NewDockerOrchestrator()
 	if err != nil {
 		log.Fatalf("failed to initialize orchestrator: %v", err)
@@ -42,7 +39,6 @@ func main() {
 
 	r := gin.Default()
 
-	// CORS middleware
 	r.Use(func(c *gin.Context) {
 		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
@@ -64,7 +60,6 @@ func main() {
 		serveWs(hub, c.Writer, c.Request)
 	})
 
-	// Projects API
 	v1 := r.Group("/api/v1")
 	{
 		v1.GET("/projects", func(c *gin.Context) {
@@ -103,7 +98,6 @@ func main() {
 				return
 			}
 
-			// Add live docker info if running
 			liveInfo := gin.H{"state": "stopped", "memory": 0}
 			if len(project.Deployments) > 0 && project.Deployments[0].ContainerID != "" {
 				containerID := project.Deployments[0].ContainerID
@@ -120,7 +114,6 @@ func main() {
 		})
 
 		v1.GET("/projects/:id/files", func(c *gin.Context) {
-			// Disabled for now
 			c.JSON(200, []string{})
 		})
 
@@ -148,9 +141,7 @@ func main() {
 
 			buf := make([]byte, 8192)
 			n, _ := reader.Read(buf)
-			
-			// Docker logs have an 8-byte header if no TTY is used.
-			// [1, 0, 0, 0, size1, size2, size3, size4]
+
 			output := ""
 			data := buf[:n]
 			for len(data) > 8 {
@@ -163,7 +154,9 @@ func main() {
 				output += string(data[8:end])
 				data = data[end:]
 			}
-			if output == "" && n > 0 { output = string(buf[:n]) } // Fallback
+			if output == "" && n > 0 {
+				output = string(buf[:n])
+			} // Fallback
 
 			c.String(200, output)
 		})
@@ -222,7 +215,6 @@ func main() {
 				return
 			}
 
-			// Cleanup containers
 			for _, d := range project.Deployments {
 				if d.ContainerID != "" {
 					orch.StopContainer(context.Background(), d.ContainerID)
@@ -293,8 +285,6 @@ func main() {
 				return
 			}
 
-			// Simple branch matching for now
-			// In production, we should verify signatures/tokens
 			trigger := false
 			if provider == "github" {
 				var payload struct {
@@ -319,11 +309,8 @@ func main() {
 			}
 
 			if trigger {
-				// Trigger deployment (reuse logic)
-				// We'll extract deployment to a function later if needed
+
 				c.JSON(202, gin.H{"message": "Deployment triggered"})
-				// Actually call the deploy logic here or redirect/call handler
-				// For now, let's just use a simple trigger
 				go handleDeploy(db, orch, hub, project)
 			} else {
 				c.JSON(200, gin.H{"message": "No action taken"})
@@ -385,8 +372,7 @@ func main() {
 				latest := &deployments[0]
 				fmt.Printf("Pausing container %s for project %s\n", latest.ContainerID, id)
 				err := orch.StopContainer(context.Background(), latest.ContainerID)
-				
-				// Handle success or ignorable errors
+
 				if err == nil || strings.Contains(err.Error(), "already stopped") {
 					latest.Status = models.StatusPaused
 					latest.IsPaused = true
@@ -395,7 +381,6 @@ func main() {
 					c.JSON(200, gin.H{"message": "Project paused"})
 					return
 				} else if strings.Contains(err.Error(), "No such container") {
-					// Container is gone, update DB state
 					latest.Status = models.StatusFailed
 					latest.ContainerID = ""
 					db.Save(latest)
@@ -418,7 +403,7 @@ func main() {
 				latest := &deployments[0]
 				fmt.Printf("Resuming container %s for project %s\n", latest.ContainerID, id)
 				err := orch.StartContainer(context.Background(), latest.ContainerID)
-				
+
 				if err == nil || strings.Contains(err.Error(), "already started") {
 					latest.Status = models.StatusReady
 					latest.IsPaused = false
@@ -453,7 +438,6 @@ func handleDeploy(db *gorm.DB, orch *orchestrator.DockerOrchestrator, hub *Hub, 
 	db.Create(&deployment)
 	hub.BroadcastStatus(project.ID, string(models.StatusBuilding), 0)
 
-	// Ensure data directory exists
 	projectBaseDir := filepath.Join("data", "projects")
 	if _, err := os.Stat(projectBaseDir); os.IsNotExist(err) {
 		os.MkdirAll(projectBaseDir, 0755)
@@ -461,7 +445,6 @@ func handleDeploy(db *gorm.DB, orch *orchestrator.DockerOrchestrator, hub *Hub, 
 
 	projectDir := filepath.Join(projectBaseDir, fmt.Sprintf("%d", project.ID))
 
-	// 1. Clone or Pull
 	if _, err := os.Stat(filepath.Join(projectDir, ".git")); os.IsNotExist(err) {
 		fmt.Printf("Cloning %s into %s\n", project.RepoURL, projectDir)
 		hub.BroadcastLogs(project.ID, "Cloning repository...\n")
@@ -474,7 +457,6 @@ func handleDeploy(db *gorm.DB, orch *orchestrator.DockerOrchestrator, hub *Hub, 
 	} else {
 		fmt.Printf("Updating repository in %s\n", projectDir)
 		hub.BroadcastLogs(project.ID, "Updating repository...\n")
-		// Fetch and Reset to ensure clean state
 		cmd := exec.Command("git", "-C", projectDir, "fetch", "origin", project.Branch)
 		if out, err := cmd.CombinedOutput(); err != nil {
 			updateDeploymentStatus(db, &deployment, models.StatusFailed, "Git fetch failed: "+string(out))
@@ -489,7 +471,6 @@ func handleDeploy(db *gorm.DB, orch *orchestrator.DockerOrchestrator, hub *Hub, 
 		}
 	}
 
-	// 2. Prepare Dockerfile
 	workDir := projectDir
 	if project.RootDirectory != "" {
 		workDir = filepath.Join(projectDir, project.RootDirectory)
@@ -498,7 +479,6 @@ func handleDeploy(db *gorm.DB, orch *orchestrator.DockerOrchestrator, hub *Hub, 
 	dockerfileName := "Dockerfile"
 	dockerfilePath := filepath.Join(workDir, dockerfileName)
 
-	// If user provided build commands, we override the repo Dockerfile to ensure our build pipeline works
 	forceBuild := project.BuildCommand != "" || project.InstallCommand != ""
 
 	if _, err := os.Stat(dockerfilePath); os.IsNotExist(err) || forceBuild {
@@ -509,7 +489,7 @@ func handleDeploy(db *gorm.DB, orch *orchestrator.DockerOrchestrator, hub *Hub, 
 			installCmd = "bun install"
 		}
 		buildCmd := project.BuildCommand
-		
+
 		buildStep := ""
 		if buildCmd != "" {
 			buildStep = fmt.Sprintf("RUN %s", buildCmd)
@@ -520,13 +500,11 @@ func handleDeploy(db *gorm.DB, orch *orchestrator.DockerOrchestrator, hub *Hub, 
 			startCmd = "bun run start"
 		}
 
-		// Detect lockfiles
 		lockfile := "bun.lockb*"
 		if _, err := os.Stat(filepath.Join(workDir, "bun.lock")); err == nil {
 			lockfile = "bun.lock*"
 		}
 
-		// Prepare ENV/ARG for build
 		var buildArgsList []string
 		for _, ev := range project.EnvVars {
 			buildArgsList = append(buildArgsList, fmt.Sprintf("ARG %s\nENV %s=$%s", ev.Key, ev.Key, ev.Key))
@@ -565,10 +543,8 @@ CMD ["sh", "-c", "%s"]
 		fmt.Println("Multi-stage Dockerfile generated successfully")
 	}
 
-	// 3. Build
 	imageName := fmt.Sprintf("orchestro-p%d", project.ID)
-	
-	// Prepare Build Args
+
 	buildArgs := make(map[string]*string)
 	for _, ev := range project.EnvVars {
 		val := ev.Value
@@ -578,7 +554,7 @@ CMD ["sh", "-c", "%s"]
 	buildLogs, err := orch.BuildImage(context.Background(), workDir, imageName, dockerfileName, buildArgs, func(line string) {
 		hub.BroadcastLogs(project.ID, line)
 	})
-	
+
 	deployment.Logs = buildLogs
 	if err != nil {
 		updateDeploymentStatus(db, &deployment, models.StatusFailed, "Build failed: "+err.Error()+"\nLogs:\n"+buildLogs)
@@ -587,8 +563,6 @@ CMD ["sh", "-c", "%s"]
 	}
 	db.Save(&deployment)
 
-	// 4. Run
-	// Cleanup previous containers for this project to free up the port
 	var oldDeployments []models.Deployment
 	db.Where("project_id = ? AND container_id != ''", project.ID).Find(&oldDeployments)
 	for _, oldDep := range oldDeployments {
@@ -605,19 +579,17 @@ CMD ["sh", "-c", "%s"]
 	containerName := fmt.Sprintf("orchestro-c%d-%d", project.ID, deployment.ID)
 	fmt.Printf("Starting container %s\n", containerName)
 	hub.BroadcastLogs(project.ID, "Starting container...\n")
-	// Port assignment
+
 	port := project.CustomPort
 	if port == 0 {
 		port = 3000 + int(project.ID)
 	}
 
-	// Prepare ENV
 	var env []string
 	for _, ev := range project.EnvVars {
 		env = append(env, fmt.Sprintf("%s=%s", ev.Key, ev.Value))
 	}
 
-	// Prepare Volumes
 	var volumes []string
 	for _, v := range project.Volumes {
 		volumes = append(volumes, fmt.Sprintf("%s:%s", v.HostPath, v.ContainerPath))
@@ -649,10 +621,8 @@ func handleBackup(db *gorm.DB, project models.Project) (models.Backup, error) {
 	timestamp := time.Now().Format("20060102-150405")
 	backupPath := filepath.Join(backupDir, fmt.Sprintf("backup-%d-%s.tar.gz", project.ID, timestamp))
 
-	// Base files to backup
 	args := []string{"-czf", backupPath, "orchestro.db"}
 
-	// Include project volumes if they are relative/accessible paths
 	for _, v := range project.Volumes {
 		if _, err := os.Stat(v.HostPath); err == nil {
 			args = append(args, v.HostPath)
