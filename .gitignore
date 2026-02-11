@@ -1,0 +1,27 @@
+# Orchestro Root Gitignore
+
+# API (Go)
+api/data/*
+api/backups/*
+api/orchestro.db
+api/orchestro
+api/main
+
+# Web (Next.js)
+web/node_modules/
+web/.next/
+web/out/
+web/build/
+web/.env*.local
+web/.vercel
+web/*.tsbuildinfo
+web/next-env.d.ts
+
+# General
+.DS_Store
+*.log
+.env
+.env.local
+node_modules/
+dist/
+tmp/

@@ -385,12 +385,21 @@ func main() {
 				latest := &deployments[0]
 				fmt.Printf("Pausing container %s for project %s\n", latest.ContainerID, id)
 				err := orch.StopContainer(context.Background(), latest.ContainerID)
+				
+				// Handle success or ignorable errors
 				if err == nil || strings.Contains(err.Error(), "already stopped") {
 					latest.Status = models.StatusPaused
 					latest.IsPaused = true
 					db.Save(latest)
 					hub.BroadcastStatus(latest.ProjectID, string(models.StatusPaused), latest.Port)
 					c.JSON(200, gin.H{"message": "Project paused"})
+					return
+				} else if strings.Contains(err.Error(), "No such container") {
+					// Container is gone, update DB state
+					latest.Status = models.StatusFailed
+					latest.ContainerID = ""
+					db.Save(latest)
+					c.JSON(400, gin.H{"error": "Container no longer exists"})
 					return
 				} else {
 					c.JSON(500, gin.H{"error": err.Error()})
@@ -409,12 +418,19 @@ func main() {
 				latest := &deployments[0]
 				fmt.Printf("Resuming container %s for project %s\n", latest.ContainerID, id)
 				err := orch.StartContainer(context.Background(), latest.ContainerID)
+				
 				if err == nil || strings.Contains(err.Error(), "already started") {
 					latest.Status = models.StatusReady
 					latest.IsPaused = false
 					db.Save(latest)
 					hub.BroadcastStatus(latest.ProjectID, string(models.StatusReady), latest.Port)
 					c.JSON(200, gin.H{"message": "Project resumed"})
+					return
+				} else if strings.Contains(err.Error(), "No such container") {
+					latest.Status = models.StatusFailed
+					latest.ContainerID = ""
+					db.Save(latest)
+					c.JSON(400, gin.H{"error": "Container no longer exists"})
 					return
 				} else {
 					c.JSON(500, gin.H{"error": err.Error()})
