@@ -113,10 +113,10 @@ export default function ProjectPage() {
       const res = await fetch(`${API_URL}/api/v1/projects/${id}`);
       if (!res.ok) throw new Error("Failed to fetch project");
       const data = await res.json();
-      setProject(data.project);
-      setLiveInfo(data.live);
-      if (data.project.deployments?.[0]?.logs && logs === "")
-        setLogs(data.project.deployments[0].logs);
+      setProject(data.project || null);
+      setLiveInfo(data.live || {});
+      if (data.project?.deployments?.[0]?.logs && logs === "")
+        setLogs(data.project.deployments[0].logs || "");
     } catch (err) {
       console.error(err);
     }
