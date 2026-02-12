@@ -19,7 +19,7 @@ import (
 )
 
 func main() {
-	db, err := gorm.Open(sqlite.Open("orchestro.db"), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open("data/orchestro.db"), &gorm.Config{})
 	if err != nil {
 		log.Fatalf("failed to connect database: %v", err)
 	}
@@ -621,7 +621,7 @@ func handleBackup(db *gorm.DB, project models.Project) (models.Backup, error) {
 	timestamp := time.Now().Format("20060102-150405")
 	backupPath := filepath.Join(backupDir, fmt.Sprintf("backup-%d-%s.tar.gz", project.ID, timestamp))
 
-	args := []string{"-czf", backupPath, "orchestro.db"}
+	args := []string{"-czf", backupPath, "data/orchestro.db"}
 
 	for _, v := range project.Volumes {
 		if _, err := os.Stat(v.HostPath); err == nil {
