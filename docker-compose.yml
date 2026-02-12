@@ -5,7 +5,7 @@ services:
       dockerfile: ../Dockerfile.api
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./api/orchestro.db:/app/orchestro.db
+      - ./api/data:/app/data
     ports:
       - "8080:8080"
     environment:
@@ -15,9 +15,9 @@ services:
     build:
       context: ./web
       dockerfile: ../Dockerfile.web
+      args:
+        - NEXT_PUBLIC_API_URL=https://api.orchestro.timuzkas.xyz
     ports:
       - "3000:3000"
-    environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8080
     depends_on:
       - api
