@@ -59,6 +59,7 @@ interface Project {
   custom_port: number;
   internal_port: number;
   docker_compose: string;
+  custom_dockerfile: string;
   webhook_secret: string;
   git_provider: string;
   webhook_branch: string;
@@ -468,9 +469,9 @@ export default function ProjectPage() {
                   </div>
                 </div>
                 <div className="bg-zinc-950 border border-zinc-900 rounded-3xl p-6 flex flex-col h-[400px]">
-                  <div className="flex items-center gap-2 mb-6"><FileCode size={18} className="text-zinc-500" /><h3 className="text-lg font-serif">Docker Compose</h3></div>
+                  <div className="flex items-center gap-2 mb-6"><FileCode size={18} className="text-zinc-500" /><h3 className="text-lg font-serif">Custom Dockerfile</h3></div>
                   <div className="relative flex-1 group">
-                    <textarea value={project.docker_compose || ""} onChange={(e) => setProject({ ...project, docker_compose: e.target.value })} className="w-full h-full bg-black border border-zinc-900 rounded-2xl p-4 font-mono text-[10px] text-zinc-500 focus:outline-none focus:border-zinc-700 resize-none scrollbar-hide transition-colors" placeholder="Custom docker-compose.yml content..." />
+                    <textarea value={project.custom_dockerfile || ""} onChange={(e) => setProject({ ...project, custom_dockerfile: e.target.value })} className="w-full h-full bg-black border border-zinc-900 rounded-2xl p-4 font-mono text-[10px] text-zinc-500 focus:outline-none focus:border-zinc-700 resize-none scrollbar-hide transition-colors" placeholder="Override auto-generated Dockerfile. Leave empty to use default..." />
                     <div className="absolute bottom-4 right-4"><button onClick={() => handleUpdateProject()} disabled={isSaving} className="bg-white text-black px-4 py-2 rounded-xl text-[10px] uppercase font-bold hover:bg-zinc-200 transition-all active:scale-95 disabled:opacity-50">{isSaving ? "Saving..." : "Save Config"}</button></div>
                   </div>
                 </div>
