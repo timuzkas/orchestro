@@ -426,8 +426,8 @@ func main() {
 		})
 	}
 
-	log.Println("Orchestro API starting on :8080")
-	r.Run(":8080")
+	log.Println("Orchestro API starting on :3131")
+	r.Run(":3131")
 }
 
 func handleDeploy(db *gorm.DB, orch *orchestrator.DockerOrchestrator, hub *Hub, project models.Project) {
@@ -519,6 +519,7 @@ func handleDeploy(db *gorm.DB, orch *orchestrator.DockerOrchestrator, hub *Hub, 
 		dockerfileContent := fmt.Sprintf(`
 # Build Stage
 FROM oven/bun:latest AS builder
+RUN apt-get update && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 %s
 COPY package.json %s ./
@@ -528,6 +529,7 @@ COPY . .
 
 # Production Stage
 FROM oven/bun:latest
+RUN apt-get update && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=builder /app ./
 EXPOSE %d
