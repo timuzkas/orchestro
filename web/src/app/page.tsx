@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Plus, Github, ExternalLink, Activity, Package, X, Settings, RefreshCw } from "lucide-react";
+import { useEffect, useState, useCallback } from "react";
+import { Plus, ExternalLink, Package, X, Settings, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { apiFetch, getWsUrl } from "@/lib/api";
 
@@ -29,18 +29,31 @@ function CustomModal({ isOpen, onClose, title, children }: ModalProps) {
   );
 }
 
+interface Deployment {
+  id: number;
+  status: string;
+  port?: number;
+  created_at: string;
+}
+
 interface Project {
   id: number;
   name: string;
   repo_url: string;
   branch: string;
-  deployments?: any[];
+  deployments?: Deployment[];
   live_state?: string;
+}
+
+interface Stats {
+  total_projects: number;
+  active_containers: number;
+  total_deployments: number;
 }
 
 export default function Home() {
   const [projects, setProjects] = useState<Project[]>([]);
-  const [stats, setStats] = useState<any>(null);
+  const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; title: string; message: string; onConfirm: () => void } | null>(null);
@@ -58,7 +71,7 @@ export default function Home() {
   });
   const [showAdvanced, setShowAdvanced] = useState(false);
 
-  const fetchProjects = () => {
+  const fetchProjects = useCallback(() => {
     apiFetch("/api/v1/projects")
       .then((res) => res.json())
       .then((data) => {
@@ -72,9 +85,9 @@ export default function Home() {
 
     apiFetch("/api/v1/stats")
       .then((res) => res.json())
-      .then((data) => setStats(data || {}))
+      .then((data) => setStats(data || { total_projects: 0, active_containers: 0, total_deployments: 0 }))
       .catch((err) => console.error("Failed to fetch stats:", err));
-  };
+  }, []);
 
   useEffect(() => {
     fetchProjects();
@@ -87,7 +100,7 @@ export default function Home() {
     };
 
     return () => ws.close();
-  }, []);
+  }, [fetchProjects]);
 
   const handleCreateProject = async (e: React.FormEvent) => {
     e.preventDefault();

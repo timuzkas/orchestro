@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -47,6 +47,33 @@ function CustomModal({ isOpen, onClose, title, children }: ModalProps) {
   );
 }
 
+interface Deployment {
+  id: number;
+  status: string;
+  port?: number;
+  created_at: string;
+  logs?: string;
+  memory?: number;
+}
+
+interface EnvVar {
+  id: number;
+  key: string;
+  value: string;
+}
+
+interface Backup {
+  id: number;
+  created_at: string;
+  size: number;
+}
+
+interface Volume {
+  id: number;
+  host_path: string;
+  container_path: string;
+}
+
 interface Project {
   id: number;
   name: string;
@@ -64,17 +91,17 @@ interface Project {
   webhook_secret: string;
   git_provider: string;
   webhook_branch: string;
-  deployments?: any[];
-  env_vars?: any[];
-  backups?: any[];
-  volumes?: any[];
+  deployments?: Deployment[];
+  env_vars?: EnvVar[];
+  backups?: Backup[];
+  volumes?: Volume[];
 }
 
 export default function ProjectPage() {
   const { id } = useParams();
   const router = useRouter();
   const [project, setProject] = useState<Project | null>(null);
-  const [liveInfo, setLiveInfo] = useState<any>(null);
+  const [liveInfo, setLiveInfo] = useState<{ state: string; memory: number } | null>(null);
   const [activeTab, setActiveTab] = useState("overview");
   const [logType, setLogType] = useState<"build" | "runtime">("build");
   const [logs, setLogs] = useState("");
@@ -96,7 +123,7 @@ export default function ProjectPage() {
     onConfirm: () => void;
   } | null>(null);
 
-  const fetchRuntimeLogs = async () => {
+  const fetchRuntimeLogs = useCallback(async () => {
     try {
       const res = await apiFetch(`/api/v1/projects/${id}/logs/runtime`);
       if (res.ok) {
@@ -106,21 +133,21 @@ export default function ProjectPage() {
     } catch (err) {
       console.error("Failed to fetch runtime logs:", err);
     }
-  };
+  }, [id]);
 
-  const fetchProject = async () => {
+  const fetchProject = useCallback(async () => {
     try {
       const res = await apiFetch(`/api/v1/projects/${id}`);
       if (!res.ok) throw new Error("Failed to fetch project");
       const data = await res.json();
       setProject(data.project || null);
-      setLiveInfo(data.live || {});
+      setLiveInfo(data.live || { state: "unknown", memory: 0 });
       if (data.project?.deployments?.[0]?.logs && logs === "")
         setLogs(data.project.deployments[0].logs || "");
     } catch (err) {
       console.error(err);
     }
-  };
+  }, [id, logs]);
 
   useEffect(() => {
     fetchProject();
@@ -146,20 +173,21 @@ export default function ProjectPage() {
       if (ws) ws.close();
       clearTimeout(reconnectTimeout);
     };
-  }, [id]);
+  }, [id, fetchProject]);
 
   useEffect(() => {
     if (logType === "runtime" && activeTab === "logs") {
       const interval = setInterval(fetchRuntimeLogs, 3000);
       return () => clearInterval(interval);
     }
-  }, [logType, activeTab, id]);
+  }, [logType, activeTab, fetchRuntimeLogs]);
 
   useEffect(() => {
     if (logEndRef.current) {
       logEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [logs, runtimeLogs]);
+
 
   const handleDeploy = async () => {
     setLogs("Starting deployment...\n");
@@ -401,7 +429,7 @@ export default function ProjectPage() {
                                       </span>
                                     </div>
                   
-                  {liveInfo?.memory > 0 && (
+                  {liveInfo && liveInfo.memory > 0 && (
                     <div className="mt-4 bg-black/40 border border-zinc-900 rounded-2xl p-4">
                       <p className="text-[10px] uppercase tracking-widest text-zinc-600 font-bold mb-1">Memory Usage</p>
                       <p className="text-xl font-mono text-zinc-300">{(liveInfo.memory / 1024 / 1024).toFixed(1)} <span className="text-xs text-zinc-500">MB</span></p>
@@ -442,7 +470,7 @@ export default function ProjectPage() {
                     <button onClick={() => setIsEnvModalOpen(true)} className="text-[10px] uppercase tracking-widest font-bold bg-white/5 border border-white/10 px-3 py-1.5 rounded-lg hover:bg-white/10 transition-colors">Add Var</button>
                   </div>
                   <div className="space-y-2 overflow-y-auto pr-2 flex-1 scrollbar-hide">
-                    {project.env_vars?.length === 0 ? <div className="h-full flex items-center justify-center border border-dashed border-zinc-900 rounded-2xl italic text-zinc-600 text-xs">No variables defined</div> : project.env_vars?.map((ev: any) => (
+                    {project.env_vars?.length === 0 ? <div className="h-full flex items-center justify-center border border-dashed border-zinc-900 rounded-2xl italic text-zinc-600 text-xs">No variables defined</div> : project.env_vars?.map((ev: EnvVar) => (
                       <div key={ev.id} className="flex justify-between items-center bg-black/40 border border-zinc-900 p-3 rounded-xl group transition-colors hover:border-zinc-800">
                         <div className="flex flex-col gap-0.5 overflow-hidden"><span className="text-[10px] text-zinc-600 font-bold uppercase tracking-tighter">Key</span><code className="text-zinc-400 text-[11px] font-mono truncate">{ev.key}</code></div>
                         <button onClick={() => handleDeleteEnv(ev.id)} className="p-2 text-zinc-700 hover:text-red-500 transition-colors"><X size={14} /></button>
@@ -456,7 +484,7 @@ export default function ProjectPage() {
                     <button onClick={() => setIsVolumeModalOpen(true)} className="text-[10px] uppercase tracking-widest font-bold bg-white/5 border border-white/10 px-3 py-1.5 rounded-lg hover:bg-white/10 transition-colors">Add Mount</button>
                   </div>
                   <div className="space-y-2 overflow-y-auto pr-2 flex-1 scrollbar-hide">
-                    {project.volumes?.length === 0 ? <div className="h-full flex items-center justify-center border border-dashed border-zinc-900 rounded-2xl italic text-zinc-600 text-xs">No persistent volumes</div> : project.volumes?.map((v: any) => (
+                    {project.volumes?.length === 0 ? <div className="h-full flex items-center justify-center border border-dashed border-zinc-900 rounded-2xl italic text-zinc-600 text-xs">No persistent volumes</div> : project.volumes?.map((v: Volume) => (
                       <div key={v.id} className="bg-black/40 border border-zinc-900 p-3 rounded-xl group transition-colors hover:border-zinc-800 relative">
                         <div className="flex flex-col gap-2 overflow-hidden">
                           <div className="flex items-center gap-2"><div className="w-1 h-1 rounded-full bg-zinc-700" /><code className="text-[10px] text-zinc-500 truncate">{v.host_path}</code></div>
@@ -482,13 +510,13 @@ export default function ProjectPage() {
                     <span className="text-[10px] text-zinc-600 uppercase font-bold tracking-widest">{project.deployments?.length || 0} Records</span>
                   </div>
                   <div className="space-y-3">
-                    {project.deployments?.length === 0 ? <div className="py-12 text-center text-zinc-700 italic bg-black/20 border border-dashed border-zinc-900 rounded-2xl">No deployment history available</div> : project.deployments?.slice(0, 5).map((d: any) => (
+                    {project.deployments?.length === 0 ? <div className="py-12 text-center text-zinc-700 italic bg-black/20 border border-dashed border-zinc-900 rounded-2xl">No deployment history available</div> : project.deployments?.slice(0, 5).map((d: Deployment) => (
                       <div key={d.id} className="flex justify-between items-center bg-black/40 border border-zinc-900 p-4 rounded-2xl group hover:border-zinc-800 transition-colors">
                         <div className="flex items-center gap-4">
                           <div className={`w-2 h-2 rounded-full ${d.status === "ready" ? "bg-green-500" : d.status === "failed" ? "bg-red-500" : "bg-zinc-700"}`} />
                           <div><p className="text-sm font-medium capitalize text-zinc-300">{d.status}</p><p className="text-[10px] text-zinc-600 font-mono">{new Date(d.created_at).toLocaleString()}</p></div>
                         </div>
-                        <button onClick={() => { setLogs(d.logs); setActiveTab("logs"); }} className="text-[10px] uppercase font-bold text-zinc-500 group-hover:text-white transition-colors flex items-center gap-2"><Terminal size={14} /> Inspect Logs</button>
+                        <button onClick={() => { if (d.logs) setLogs(d.logs); setActiveTab("logs"); }} className="text-[10px] uppercase font-bold text-zinc-500 group-hover:text-white transition-colors flex items-center gap-2"><Terminal size={14} /> Inspect Logs</button>
                       </div>
                     ))}
                   </div>
@@ -510,7 +538,7 @@ export default function ProjectPage() {
                 <button onClick={handleCreateBackup} className="bg-white text-black px-6 py-2 rounded-full font-medium hover:bg-zinc-200 transition-colors">Create Backup</button>
               </div>
               <div className="space-y-4">
-                {project.backups?.length === 0 ? <div className="py-20 text-center text-zinc-600">No backups created yet.</div> : project.backups?.map((b: any) => (
+                {project.backups?.length === 0 ? <div className="py-20 text-center text-zinc-600">No backups created yet.</div> : project.backups?.map((b: Backup) => (
                   <div key={b.id} className="flex justify-between items-center bg-zinc-900/30 border border-zinc-900 p-4 rounded-2xl">
                     <div className="flex items-center gap-4"><Archive className="text-zinc-500" size={20} /><div><p className="text-sm font-medium">{new Date(b.created_at).toLocaleString()}</p><p className="text-xs text-zinc-500">{(b.size / 1024 / 1024).toFixed(2)} MB</p></div></div>
                     <a href={`${API_URL}/api/v1/backups/${b.id}/download`} download className="text-xs text-zinc-400 hover:text-white transition-colors bg-white/5 border border-white/10 px-3 py-1 rounded-lg">Download</a>
