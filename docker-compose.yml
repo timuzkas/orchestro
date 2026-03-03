@@ -1,9 +1,0 @@
-services:
-  web:
-    build:
-      context: ./web
-      dockerfile: ../Dockerfile.web
-      args:
-        - NEXT_PUBLIC_API_URL=https://api.orchestro.domain.com
-    ports:
-      - "8181:3000"
