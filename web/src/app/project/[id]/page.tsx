@@ -18,6 +18,7 @@ import {
   Package,
 } from "lucide-react";
 import Link from "next/link";
+import { apiFetch, getWsUrl, API_URL } from "@/lib/api";
 
 interface ModalProps {
   isOpen: boolean;
@@ -83,8 +84,6 @@ export default function ProjectPage() {
   const [isActionLoading, setIsActionLoading] = useState(false);
   const logEndRef = useRef<HTMLDivElement>(null);
 
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
-
   const [isEnvModalOpen, setIsEnvModalOpen] = useState(false);
   const [isVolumeModalOpen, setIsVolumeModalOpen] = useState(false);
   const [newEnv, setNewEnv] = useState({ key: "", value: "" });
@@ -99,7 +98,7 @@ export default function ProjectPage() {
 
   const fetchRuntimeLogs = async () => {
     try {
-      const res = await fetch(`${API_URL}/api/v1/projects/${id}/logs/runtime`);
+      const res = await apiFetch(`/api/v1/projects/${id}/logs/runtime`);
       if (res.ok) {
         const text = await res.text();
         setRuntimeLogs(text);
@@ -111,7 +110,7 @@ export default function ProjectPage() {
 
   const fetchProject = async () => {
     try {
-      const res = await fetch(`${API_URL}/api/v1/projects/${id}`);
+      const res = await apiFetch(`/api/v1/projects/${id}`);
       if (!res.ok) throw new Error("Failed to fetch project");
       const data = await res.json();
       setProject(data.project || null);
@@ -128,7 +127,7 @@ export default function ProjectPage() {
     let ws: WebSocket;
     let reconnectTimeout: NodeJS.Timeout;
     const connect = () => {
-      ws = new WebSocket(`${API_URL.replace("http", "ws")}/ws`);
+      ws = new WebSocket(getWsUrl());
       ws.onopen = () => setWsConnected(true);
       ws.onclose = () => {
         setWsConnected(false);
@@ -147,7 +146,7 @@ export default function ProjectPage() {
       if (ws) ws.close();
       clearTimeout(reconnectTimeout);
     };
-  }, [id, API_URL]);
+  }, [id]);
 
   useEffect(() => {
     if (logType === "runtime" && activeTab === "logs") {
@@ -164,14 +163,14 @@ export default function ProjectPage() {
 
   const handleDeploy = async () => {
     setLogs("Starting deployment...\n");
-    await fetch(`${API_URL}/api/v1/projects/${id}/deploy`, { method: "POST" });
+    await apiFetch(`/api/v1/projects/${id}/deploy`, { method: "POST" });
     fetchProject();
   };
 
   const handlePause = async () => {
     setIsActionLoading(true);
     try {
-      await fetch(`${API_URL}/api/v1/projects/${id}/pause`, { method: "POST" });
+      await apiFetch(`/api/v1/projects/${id}/pause`, { method: "POST" });
       fetchProject();
     } finally {
       setIsActionLoading(false);
@@ -181,7 +180,7 @@ export default function ProjectPage() {
   const handleResume = async () => {
     setIsActionLoading(true);
     try {
-      await fetch(`${API_URL}/api/v1/projects/${id}/resume`, { method: "POST" });
+      await apiFetch(`/api/v1/projects/${id}/resume`, { method: "POST" });
       fetchProject();
     } finally {
       setIsActionLoading(false);
@@ -193,7 +192,7 @@ export default function ProjectPage() {
     if (!project) return;
     setIsSaving(true);
     try {
-      await fetch(`${API_URL}/api/v1/projects/${id}`, {
+      await apiFetch(`/api/v1/projects/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(project),
@@ -207,7 +206,7 @@ export default function ProjectPage() {
   const handleAddEnv = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newEnv.key || !newEnv.value) return;
-    await fetch(`${API_URL}/api/v1/projects/${id}/env`, {
+    await apiFetch(`/api/v1/projects/${id}/env`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(newEnv),
@@ -223,7 +222,7 @@ export default function ProjectPage() {
       title: "Delete Variable",
       message: "Are you sure you want to delete this environment variable?",
       onConfirm: async () => {
-        await fetch(`${API_URL}/api/v1/projects/${id}/env/${envId}`, { method: "DELETE" });
+        await apiFetch(`/api/v1/projects/${id}/env/${envId}`, { method: "DELETE" });
         setConfirmModal(null);
         fetchProject();
       },
@@ -233,7 +232,7 @@ export default function ProjectPage() {
   const handleAddVolume = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newVolume.host_path || !newVolume.container_path) return;
-    await fetch(`${API_URL}/api/v1/projects/${id}/volumes`, {
+    await apiFetch(`/api/v1/projects/${id}/volumes`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(newVolume),
@@ -249,7 +248,7 @@ export default function ProjectPage() {
       title: "Delete Volume",
       message: "Are you sure you want to remove this volume mapping?",
       onConfirm: async () => {
-        await fetch(`${API_URL}/api/v1/projects/${id}/volumes/${volumeId}`, { method: "DELETE" });
+        await apiFetch(`/api/v1/projects/${id}/volumes/${volumeId}`, { method: "DELETE" });
         setConfirmModal(null);
         fetchProject();
       },
@@ -257,7 +256,7 @@ export default function ProjectPage() {
   };
 
   const handleCreateBackup = async () => {
-    await fetch(`${API_URL}/api/v1/projects/${id}/backups`, { method: "POST" });
+    await apiFetch(`/api/v1/projects/${id}/backups`, { method: "POST" });
     fetchProject();
   };
 
@@ -615,7 +614,7 @@ export default function ProjectPage() {
 
               <div className="bg-red-500/5 border border-red-500/10 rounded-3xl p-8 max-w-3xl flex justify-between items-center">
                 <div><h3 className="text-xl font-serif text-red-500">Danger Zone</h3><p className="text-xs text-zinc-500 mt-1">Delete project, logs, and containers forever.</p></div>
-                <button onClick={() => setConfirmModal({ isOpen: true, title: "Delete Project", variant: "danger", message: "This will permanently remove the project and all associated data. This action cannot be undone.", onConfirm: async () => { await fetch(`${API_URL}/api/v1/projects/${id}`, { method: "DELETE" }); router.push("/"); } })} className="bg-red-500/10 text-red-500 border border-red-500/20 px-6 py-2.5 rounded-xl hover:bg-red-500/20 transition-all active:scale-95 text-xs font-bold">Delete Project</button>
+                <button onClick={() => setConfirmModal({ isOpen: true, title: "Delete Project", variant: "danger", message: "This will permanently remove the project and all associated data. This action cannot be undone.", onConfirm: async () => { await apiFetch(`/api/v1/projects/${id}`, { method: "DELETE" }); router.push("/"); } })} className="bg-red-500/10 text-red-500 border border-red-500/20 px-6 py-2.5 rounded-xl hover:bg-red-500/20 transition-all active:scale-95 text-xs font-bold">Delete Project</button>
               </div>
             </div>
           )}

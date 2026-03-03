@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Plus, Github, ExternalLink, Activity, Package, X, Settings, RefreshCw } from "lucide-react";
 import Link from "next/link";
+import { apiFetch, getWsUrl } from "@/lib/api";
 
 interface ModalProps {
   isOpen: boolean;
@@ -44,8 +45,6 @@ export default function Home() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; title: string; message: string; onConfirm: () => void } | null>(null);
   
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
-
   const [newProject, setNewProject] = useState({ 
     name: "", 
     repo_url: "", 
@@ -60,7 +59,7 @@ export default function Home() {
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   const fetchProjects = () => {
-    fetch(`${API_URL}/api/v1/projects`)
+    apiFetch("/api/v1/projects")
       .then((res) => res.json())
       .then((data) => {
         setProjects(data || []);
@@ -71,7 +70,7 @@ export default function Home() {
         setLoading(false);
       });
 
-    fetch(`${API_URL}/api/v1/stats`)
+    apiFetch("/api/v1/stats")
       .then((res) => res.json())
       .then((data) => setStats(data || {}))
       .catch((err) => console.error("Failed to fetch stats:", err));
@@ -81,7 +80,7 @@ export default function Home() {
     fetchProjects();
 
     // WebSocket for real-time updates
-    const ws = new WebSocket(`${API_URL.replace("http", "ws")}/ws`);
+    const ws = new WebSocket(getWsUrl());
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
       if (data.type === "status") fetchProjects();
@@ -93,7 +92,7 @@ export default function Home() {
   const handleCreateProject = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch(`${API_URL}/api/v1/projects`, {
+      const res = await apiFetch("/api/v1/projects", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(newProject),
@@ -128,7 +127,7 @@ export default function Home() {
       title: "Delete Project",
       message: "This will permanently remove the project and all associated data. This action cannot be undone.",
       onConfirm: async () => {
-        await fetch(`${API_URL}/api/v1/projects/${id}`, {
+        await apiFetch(`/api/v1/projects/${id}`, {
           method: "DELETE",
         });
         setConfirmModal(null);
@@ -139,7 +138,7 @@ export default function Home() {
 
   const handleDeploy = async (projectId: number) => {
     try {
-      await fetch(`${API_URL}/api/v1/projects/${projectId}/deploy`, {
+      await apiFetch(`/api/v1/projects/${projectId}/deploy`, {
         method: "POST",
       });
       fetchProjects();
