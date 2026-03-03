@@ -40,6 +40,7 @@ interface Project {
   id: number;
   name: string;
   repo_url: string;
+  base_image?: string;
   branch: string;
   deployments?: Deployment[];
   live_state?: string;
@@ -62,6 +63,7 @@ export default function Home() {
     name: "", 
     repo_url: "", 
     branch: "main",
+    base_image: "oven/bun:latest",
     install_command: "bun install", 
     build_command: "bun run build", 
     output_directory: "dist",
@@ -71,6 +73,50 @@ export default function Home() {
     internal_port: 0
   });
   const [showAdvanced, setShowAdvanced] = useState(false);
+
+  const STACK_PRESETS = {
+    bun: {
+      name: "Bun",
+      base_image: "oven/bun:latest",
+      install_command: "bun install",
+      build_command: "bun run build",
+      start_command: "bun run start",
+    },
+    node: {
+      name: "Node.js (npm)",
+      base_image: "node:20-alpine",
+      install_command: "npm install",
+      build_command: "npm run build",
+      start_command: "npm start",
+    },
+    cpp: {
+      name: "C++ (Make)",
+      base_image: "gcc:latest",
+      install_command: "apt-get update && apt-get install -y make g++",
+      build_command: "make",
+      start_command: "./app",
+    },
+    python: {
+      name: "Python (pip)",
+      base_image: "python:3.11-slim",
+      install_command: "pip install -r requirements.txt",
+      build_command: "",
+      start_command: "python main.py",
+    },
+  };
+
+  const handleStackChange = (stackKey: string) => {
+    const preset = STACK_PRESETS[stackKey as keyof typeof STACK_PRESETS];
+    if (preset) {
+      setNewProject({
+        ...newProject,
+        base_image: preset.base_image,
+        install_command: preset.install_command,
+        build_command: preset.build_command,
+        start_command: preset.start_command,
+      });
+    }
+  };
 
   const fetchProjects = useCallback(() => {
     apiFetch("/api/v1/projects")
@@ -117,6 +163,7 @@ export default function Home() {
           name: "", 
           repo_url: "", 
           branch: "main",
+          base_image: "oven/bun:latest",
           install_command: "bun install", 
           build_command: "bun run build", 
           output_directory: "dist",
@@ -371,6 +418,31 @@ export default function Home() {
                     onChange={(e) => setNewProject({ ...newProject, repo_url: e.target.value })}
                     className="w-full bg-black border border-zinc-900 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-white transition-colors"
                     placeholder="https://github.com/..."
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-6">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold ml-1">Stack Preset</label>
+                  <select
+                    onChange={(e) => handleStackChange(e.target.value)}
+                    className="w-full bg-black border border-zinc-900 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-white appearance-none transition-colors"
+                  >
+                    {Object.entries(STACK_PRESETS).map(([key, preset]) => (
+                      <option key={key} value={key}>{preset.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold ml-1">Base Image</label>
+                  <input
+                    required
+                    type="text"
+                    value={newProject.base_image}
+                    onChange={(e) => setNewProject({ ...newProject, base_image: e.target.value })}
+                    className="w-full bg-black border border-zinc-900 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-white transition-colors"
+                    placeholder="e.g. node:20-alpine"
                   />
                 </div>
               </div>

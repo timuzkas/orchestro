@@ -13,6 +13,7 @@ type Project struct {
 	DeletedAt        gorm.DeletedAt `gorm:"index" json:"-"`
 	Name             string         `gorm:"uniqueIndex;not null" json:"name"`
 	RepoURL          string         `json:"repo_url"`
+	BaseImage        string         `json:"base_image" gorm:"default:'oven/bun:latest'"`
 	Branch           string         `json:"branch" gorm:"default:'main'"`
 	RootDirectory    string         `json:"root_directory" gorm:"default:''"`
 	BuildCommand     string         `json:"build_command"`

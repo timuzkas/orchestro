@@ -640,18 +640,28 @@ func handleDeploy(ctx context.Context, db *gorm.DB, orch *orchestrator.DockerOrc
 				intPort = 80
 			}
 
+			baseImage := project.BaseImage
+			if baseImage == "" {
+				baseImage = "oven/bun:latest"
+			}
+
+			// Add conditional logic for copying lockfiles if they exist
+			copyStep := ""
+			if _, err := os.Stat(filepath.Join(workDir, "package.json")); err == nil {
+				copyStep = fmt.Sprintf("COPY package.json %s ./", lockfile)
+			}
+
 			dockerfileContent := fmt.Sprintf(`
-FROM oven/bun:latest
-RUN apt-get update && apt-get install -y make g++ && rm -rf /var/lib/apt/lists/*
+FROM %s
 WORKDIR /app
 %s
-COPY package.json %s ./
+%s
 RUN %s
 COPY . .
 %s
 EXPOSE %d
 CMD ["sh", "-c", "%s"]
-`, envInject, lockfile, installCmd, buildStep, intPort, startCmd)
+`, baseImage, envInject, copyStep, installCmd, buildStep, intPort, startCmd)
 
 			err = os.WriteFile(dockerfilePath, []byte(dockerfileContent), 0644)
 			if err != nil {

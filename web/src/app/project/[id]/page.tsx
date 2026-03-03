@@ -78,6 +78,7 @@ interface Project {
   id: number;
   name: string;
   repo_url: string;
+  base_image: string;
   branch: string;
   root_directory: string;
   install_command: string;
@@ -596,9 +597,10 @@ export default function ProjectPage() {
                                 </div>
                 
                 <form onSubmit={handleUpdateProject} className="space-y-6">
-                  <div className="grid grid-cols-2 gap-6">
+                  <div className="grid grid-cols-3 gap-6">
                     <div className="space-y-1.5"><label className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold ml-1">Repository URL</label><input type="text" value={project.repo_url || ""} onChange={(e) => setProject({ ...project, repo_url: e.target.value })} className="w-full bg-black border border-zinc-900 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-white transition-colors" /></div>
                     <div className="space-y-1.5"><label className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold ml-1">Branch</label><input type="text" value={project.branch || ""} onChange={(e) => setProject({ ...project, branch: e.target.value })} className="w-full bg-black border border-zinc-900 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-white transition-colors" /></div>
+                    <div className="space-y-1.5"><label className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold ml-1">Base Image</label><input type="text" value={project.base_image || ""} onChange={(e) => setProject({ ...project, base_image: e.target.value })} className="w-full bg-black border border-zinc-900 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-white transition-colors" /></div>
                   </div>
                   <div className="space-y-1.5">
                     <div className="flex justify-between items-center ml-1"><label className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold">Root Directory</label><span className="text-[9px] text-zinc-600">Optional • Subfolder for monorepos</span></div>
