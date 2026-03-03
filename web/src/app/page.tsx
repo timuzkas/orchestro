@@ -61,6 +61,7 @@ export default function Home() {
   const [newProject, setNewProject] = useState({ 
     name: "", 
     repo_url: "", 
+    branch: "main",
     install_command: "bun install", 
     build_command: "bun run build", 
     output_directory: "dist",
@@ -115,6 +116,7 @@ export default function Home() {
         setNewProject({ 
           name: "", 
           repo_url: "", 
+          branch: "main",
           install_command: "bun install", 
           build_command: "bun run build", 
           output_directory: "dist",
@@ -373,18 +375,30 @@ export default function Home() {
                 </div>
               </div>
 
-              <div className="space-y-1.5">
-                <div className="flex justify-between items-center ml-1">
-                  <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold">Root Directory</label>
-                  <span className="text-[9px] text-zinc-600">Optional • Use for monorepos</span>
+              <div className="grid grid-cols-2 gap-6">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold ml-1">Branch</label>
+                  <input
+                    required
+                    type="text"
+                    value={newProject.branch}
+                    onChange={(e) => setNewProject({ ...newProject, branch: e.target.value })}
+                    className="w-full bg-black border border-zinc-900 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-white transition-colors"
+                    placeholder="main"
+                  />
                 </div>
-                <input
-                  type="text"
-                  value={newProject.root_directory}
-                  onChange={(e) => setNewProject({ ...newProject, root_directory: e.target.value })}
-                  className="w-full bg-black border border-zinc-900 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-white transition-colors"
-                  placeholder="e.g. apps/api"
-                />
+                <div className="space-y-1.5">
+                  <div className="flex justify-between items-center ml-1">
+                    <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold">Root Directory</label>
+                  </div>
+                  <input
+                    type="text"
+                    value={newProject.root_directory}
+                    onChange={(e) => setNewProject({ ...newProject, root_directory: e.target.value })}
+                    className="w-full bg-black border border-zinc-900 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-white transition-colors"
+                    placeholder="e.g. apps/api"
+                  />
+                </div>
               </div>
 
               <div className="pt-4 border-t border-zinc-900">

@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -16,6 +17,11 @@ import (
 	"github.com/timuzkas/orchestro/api/models"
 	"github.com/timuzkas/orchestro/api/orchestrator"
 	"gorm.io/gorm"
+)
+
+var (
+	deploymentCancels = make(map[uint]context.CancelFunc)
+	cancelMutex       sync.Mutex
 )
 
 func main() {
@@ -368,8 +374,72 @@ func main() {
 				return
 			}
 
-			go handleDeploy(db, orch, hub, project)
+			cancelMutex.Lock()
+			if cancel, exists := deploymentCancels[project.ID]; exists {
+				cancel()
+			}
+			ctx, cancel := context.WithCancel(context.Background())
+			deploymentCancels[project.ID] = cancel
+			cancelMutex.Unlock()
+
+			go handleDeploy(ctx, db, orch, hub, project)
 			c.JSON(http.StatusAccepted, gin.H{"message": "Deployment started"})
+		})
+
+		v1.POST("/projects/:id/deploy/cancel", func(c *gin.Context) {
+			id := c.Param("id")
+			var project models.Project
+			if err := db.First(&project, id).Error; err != nil {
+				c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+				return
+			}
+
+			cancelMutex.Lock()
+			if cancel, exists := deploymentCancels[project.ID]; exists {
+				cancel()
+				delete(deploymentCancels, project.ID)
+				cancelMutex.Unlock()
+
+				var deployment models.Deployment
+				db.Where("project_id = ? AND status = ?", project.ID, models.StatusBuilding).Order("id DESC").First(&deployment)
+				if deployment.ID != 0 {
+					updateDeploymentStatus(db, &deployment, models.StatusFailed, "Deployment cancelled by user.")
+				}
+				hub.BroadcastStatus(project.ID, string(models.StatusFailed), 0)
+				c.JSON(200, gin.H{"message": "Deployment cancelled"})
+			} else {
+				cancelMutex.Unlock()
+				c.JSON(400, gin.H{"error": "No active deployment found to cancel"})
+			}
+		})
+
+		v1.POST("/projects/:id/clear-data", func(c *gin.Context) {
+			id := c.Param("id")
+			var project models.Project
+			if err := db.Preload("Deployments").First(&project, id).Error; err != nil {
+				c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+				return
+			}
+
+			// Stop and remove containers
+			for _, d := range project.Deployments {
+				if d.ContainerID != "" {
+					orch.StopContainer(context.Background(), d.ContainerID)
+					orch.RemoveContainer(context.Background(), d.ContainerID)
+				}
+			}
+
+			// Delete project directory
+			projectDir := filepath.Join("data", "projects", fmt.Sprintf("%d", project.ID))
+			if err := os.RemoveAll(projectDir); err != nil {
+				c.JSON(500, gin.H{"error": "Failed to delete project data: " + err.Error()})
+				return
+			}
+
+			// Clear deployment status in DB
+			db.Model(&models.Deployment{}).Where("project_id = ?", project.ID).Update("status", "cleared")
+
+			c.JSON(200, gin.H{"message": "Project data cleared successfully"})
 		})
 
 		v1.POST("/projects/:id/pause", func(c *gin.Context) {
@@ -443,13 +513,36 @@ func main() {
 	r.Run(":" + port)
 }
 
-func handleDeploy(db *gorm.DB, orch *orchestrator.DockerOrchestrator, hub *Hub, project models.Project) {
+func handleDeploy(ctx context.Context, db *gorm.DB, orch *orchestrator.DockerOrchestrator, hub *Hub, project models.Project) {
+	defer func() {
+		cancelMutex.Lock()
+		if cancel, exists := deploymentCancels[project.ID]; exists {
+			// Check if we are cancelling OUR context
+			select {
+			case <-ctx.Done():
+				// This context is done, so it's safe to clear
+				delete(deploymentCancels, project.ID)
+			default:
+				// Context not done, it might be a new deployment that replaced us
+			}
+			_ = cancel // Use to avoid compiler error if not used, though it is
+		}
+		cancelMutex.Unlock()
+	}()
+
 	deployment := models.Deployment{
 		ProjectID: project.ID,
 		Status:    models.StatusBuilding,
 	}
 	db.Create(&deployment)
 	hub.BroadcastStatus(project.ID, string(models.StatusBuilding), 0)
+
+	select {
+	case <-ctx.Done():
+		updateDeploymentStatus(db, &deployment, models.StatusFailed, "Deployment cancelled.")
+		return
+	default:
+	}
 
 	projectBaseDir := filepath.Join("data", "projects")
 	if _, err := os.Stat(projectBaseDir); os.IsNotExist(err) {
@@ -461,7 +554,7 @@ func handleDeploy(db *gorm.DB, orch *orchestrator.DockerOrchestrator, hub *Hub, 
 	if _, err := os.Stat(filepath.Join(projectDir, ".git")); os.IsNotExist(err) {
 		fmt.Printf("Cloning %s into %s\n", project.RepoURL, projectDir)
 		hub.BroadcastLogs(project.ID, "Cloning repository...\n")
-		cmd := exec.Command("git", "clone", "--depth", "1", "-b", project.Branch, project.RepoURL, projectDir)
+		cmd := exec.CommandContext(ctx, "git", "clone", "--depth", "1", "-b", project.Branch, project.RepoURL, projectDir)
 		if out, err := cmd.CombinedOutput(); err != nil {
 			updateDeploymentStatus(db, &deployment, models.StatusFailed, "Git clone failed: "+string(out))
 			hub.BroadcastStatus(project.ID, string(models.StatusFailed), 0)
@@ -470,18 +563,25 @@ func handleDeploy(db *gorm.DB, orch *orchestrator.DockerOrchestrator, hub *Hub, 
 	} else {
 		fmt.Printf("Updating repository in %s\n", projectDir)
 		hub.BroadcastLogs(project.ID, "Updating repository...\n")
-		cmd := exec.Command("git", "-C", projectDir, "fetch", "origin", project.Branch)
+		cmd := exec.CommandContext(ctx, "git", "-C", projectDir, "fetch", "origin", project.Branch)
 		if out, err := cmd.CombinedOutput(); err != nil {
 			updateDeploymentStatus(db, &deployment, models.StatusFailed, "Git fetch failed: "+string(out))
 			hub.BroadcastStatus(project.ID, string(models.StatusFailed), 0)
 			return
 		}
-		cmd = exec.Command("git", "-C", projectDir, "reset", "--hard", "origin/"+project.Branch)
+		cmd = exec.CommandContext(ctx, "git", "-C", projectDir, "reset", "--hard", "origin/"+project.Branch)
 		if out, err := cmd.CombinedOutput(); err != nil {
 			updateDeploymentStatus(db, &deployment, models.StatusFailed, "Git reset failed: "+string(out))
 			hub.BroadcastStatus(project.ID, string(models.StatusFailed), 0)
 			return
 		}
+	}
+
+	select {
+	case <-ctx.Done():
+		updateDeploymentStatus(db, &deployment, models.StatusFailed, "Deployment cancelled.")
+		return
+	default:
 	}
 
 	workDir := projectDir
@@ -542,7 +642,7 @@ func handleDeploy(db *gorm.DB, orch *orchestrator.DockerOrchestrator, hub *Hub, 
 
 			dockerfileContent := fmt.Sprintf(`
 FROM oven/bun:latest
-RUN apt-get update && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y make g++ && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 %s
 COPY package.json %s ./
@@ -571,7 +671,7 @@ CMD ["sh", "-c", "%s"]
 		buildArgs[ev.Key] = &val
 	}
 
-	buildLogs, err := orch.BuildImage(context.Background(), workDir, imageName, dockerfileName, buildArgs, func(line string) {
+	buildLogs, err := orch.BuildImage(ctx, workDir, imageName, dockerfileName, buildArgs, func(line string) {
 		hub.BroadcastLogs(project.ID, line)
 	})
 
@@ -582,6 +682,13 @@ CMD ["sh", "-c", "%s"]
 		return
 	}
 	db.Save(&deployment)
+
+	select {
+	case <-ctx.Done():
+		updateDeploymentStatus(db, &deployment, models.StatusFailed, "Deployment cancelled.")
+		return
+	default:
+	}
 
 	var oldDeployments []models.Deployment
 	db.Where("project_id = ? AND container_id != ''", project.ID).Find(&oldDeployments)
@@ -615,7 +722,7 @@ CMD ["sh", "-c", "%s"]
 		volumes = append(volumes, fmt.Sprintf("%s:%s", v.HostPath, v.ContainerPath))
 	}
 
-	containerID, err := orch.RunContainer(context.Background(), imageName, containerName, port, project.InternalPort, env, volumes)
+	containerID, err := orch.RunContainer(ctx, imageName, containerName, port, project.InternalPort, env, volumes)
 	if err != nil {
 		if containerID != "" {
 			orch.RemoveContainer(context.Background(), containerID)

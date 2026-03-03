@@ -288,6 +288,30 @@ export default function ProjectPage() {
     fetchProject();
   };
 
+  const handleCancelDeployment = async () => {
+    setIsActionLoading(true);
+    try {
+      await apiFetch(`/api/v1/projects/${id}/deploy/cancel`, { method: "POST" });
+      fetchProject();
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const handleClearData = async () => {
+    setConfirmModal({
+      isOpen: true,
+      title: "Clear Project Data",
+      variant: "danger",
+      message: "This will permanently delete the project's data directory, including cloned source code and generated Dockerfiles. Database configuration will remain. Continue?",
+      onConfirm: async () => {
+        await apiFetch(`/api/v1/projects/${id}/clear-data`, { method: "POST" });
+        setConfirmModal(null);
+        fetchProject();
+      },
+    });
+  };
+
   if (!project) return (
     <div className="min-h-screen bg-black text-white font-sans p-8">
       <div className="max-w-6xl mx-auto space-y-12">
@@ -351,6 +375,16 @@ export default function ProjectPage() {
                 {isActionLoading ? "Resuming..." : "Resume"}
               </button>
             ) : null}
+            {currentStatus === "building" && (
+              <button 
+                onClick={handleCancelDeployment} 
+                disabled={isActionLoading} 
+                className="bg-red-500/10 text-red-500 border border-red-500/20 px-4 py-1.5 rounded-full text-sm font-medium hover:bg-red-500/20 transition-all flex items-center gap-2 disabled:opacity-50"
+              >
+                {isActionLoading ? <RefreshCw size={16} className="animate-spin" /> : <X size={16} />}
+                Abort
+              </button>
+            )}
             <button onClick={handleDeploy} disabled={currentStatus === "building"} className="bg-white text-black px-4 py-1.5 rounded-full text-sm font-medium hover:bg-zinc-200 transition-all flex items-center gap-2 disabled:opacity-50">
               <RefreshCw size={16} className={currentStatus === "building" ? "animate-spin" : ""} />
               {currentStatus === "building" ? "Building..." : project.deployments?.length ? "Redeploy" : "Deploy"}
@@ -638,6 +672,11 @@ export default function ProjectPage() {
                   
                   <button onClick={() => handleUpdateProject()} disabled={isSaving} className="text-xs bg-zinc-900 border border-zinc-800 px-6 py-2.5 rounded-xl font-medium hover:bg-zinc-800 transition-all active:scale-95">Update Webhook</button>
                 </div>
+              </div>
+
+              <div className="bg-red-500/5 border border-red-500/10 rounded-3xl p-8 max-w-3xl flex justify-between items-center mb-6">
+                <div><h3 className="text-xl font-serif text-red-500">Reset Local State</h3><p className="text-xs text-zinc-500 mt-1">Delete all project files, logs, and reset the environment.</p></div>
+                <button onClick={handleClearData} className="bg-red-500/10 text-red-500 border border-red-500/20 px-6 py-2.5 rounded-xl hover:bg-red-500/20 transition-all active:scale-95 text-xs font-bold">Clear Project Data</button>
               </div>
 
               <div className="bg-red-500/5 border border-red-500/10 rounded-3xl p-8 max-w-3xl flex justify-between items-center">
