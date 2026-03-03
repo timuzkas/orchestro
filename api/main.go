@@ -326,7 +326,7 @@ func main() {
 			if trigger {
 
 				c.JSON(202, gin.H{"message": "Deployment triggered"})
-				go handleDeploy(db, orch, hub, project)
+				go handleDeploy(context.Background(), db, orch, hub, project)
 			} else {
 				c.JSON(200, gin.H{"message": "No action taken"})
 			}
