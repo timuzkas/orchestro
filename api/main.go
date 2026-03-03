@@ -426,8 +426,12 @@ func main() {
 		})
 	}
 
-	log.Println("Orchestro API starting on :3131")
-	r.Run(":3131")
+	port := os.Getenv("PORT")
+	if port == "" {
+	    port = "3131"
+	}
+	log.Printf("Orchestro API starting on :%s", port)
+	r.Run(":" + port)
 }
 
 func handleDeploy(db *gorm.DB, orch *orchestrator.DockerOrchestrator, hub *Hub, project models.Project) {

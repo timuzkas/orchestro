@@ -5,9 +5,9 @@ Requires=docker.service
 
 [Service]
 Type=simple
-User=debian
-WorkingDirectory=/home/debian/orchestro/api
-ExecStart=/home/debian/orchestro/api/main
+User=ubuntu
+WorkingDirectory=/home/ubuntu/orchestro/api
+ExecStart=/home/ubuntu/orchestro/api/main
 Restart=always
 RestartSec=5
 Environment=GIN_MODE=release
