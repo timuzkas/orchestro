@@ -259,18 +259,18 @@ export default function Home() {
                     </div>
                     
                     <div className="flex items-center gap-4 text-sm text-zinc-500">
-                      <div className="flex items-center gap-1">
-                                            <Activity
-                                              size={14}
-                                              className={
-                                                project.live_state === "running" || project.deployments?.[0]?.status === "ready"
-                                                  ? "text-green-500"
-                                                  : project.deployments?.[0]?.status === "failed"
-                                                    ? "text-red-500"
-                                                    : "text-zinc-500"
-                                              }
-                                            />
-                        
+                      <div className="flex items-center gap-1.5">
+                        <div
+                          className={`w-1.5 h-1.5 rounded-full ${
+                            project.live_state === "running" || project.deployments?.[0]?.status === "ready"
+                              ? "bg-green-500"
+                              : project.deployments?.[0]?.status === "failed"
+                                ? "bg-red-500"
+                                : project.deployments?.[0]?.status === "paused"
+                                  ? "bg-yellow-500"
+                                  : "bg-zinc-500"
+                          }`}
+                        />
                         <span className="capitalize">
                           {project.live_state === "running"
                             ? "Online"
