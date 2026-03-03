@@ -56,11 +56,20 @@ func main() {
 		})
 	})
 
-	r.GET("/ws", func(c *gin.Context) {
+	authorized := r.Group("/")
+	apiUser := os.Getenv("API_USER")
+	apiPass := os.Getenv("API_PASS")
+	if apiUser != "" && apiPass != "" {
+		authorized.Use(gin.BasicAuth(gin.Accounts{
+			apiUser: apiPass,
+		}))
+	}
+
+	authorized.GET("/ws", func(c *gin.Context) {
 		serveWs(hub, c.Writer, c.Request)
 	})
 
-	v1 := r.Group("/api/v1")
+	v1 := authorized.Group("/api/v1")
 	{
 		v1.GET("/projects", func(c *gin.Context) {
 			var projects []models.Project

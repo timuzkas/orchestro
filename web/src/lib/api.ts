@@ -29,13 +29,17 @@ export const apiFetch = async (endpoint: string, options: RequestInit = {}) => {
 };
 
 export const getWsUrl = (path: string = "/ws") => {
-  let wsUrl = API_URL.replace(/^http/, "ws");
+  let wsUrl = API_URL.replace(/^http/, "ws").replace(/\/$/, "");
   
   if (API_USER && API_PASS) {
-    const url = new URL(wsUrl);
-    url.username = API_USER;
-    url.password = API_PASS;
-    wsUrl = url.toString();
+    try {
+      const url = new URL(wsUrl);
+      url.username = API_USER;
+      url.password = API_PASS;
+      wsUrl = url.toString().replace(/\/$/, "");
+    } catch (e) {
+      console.error("Invalid API_URL for WebSocket construction:", e);
+    }
   }
   
   return `${wsUrl}${path}`;
