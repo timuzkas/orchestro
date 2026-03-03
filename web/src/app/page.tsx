@@ -63,7 +63,7 @@ export default function Home() {
     fetch(`${API_URL}/api/v1/projects`)
       .then((res) => res.json())
       .then((data) => {
-        setProjects(data);
+        setProjects(data || []);
         setLoading(false);
       })
       .catch((err) => {
@@ -73,7 +73,7 @@ export default function Home() {
 
     fetch(`${API_URL}/api/v1/stats`)
       .then((res) => res.json())
-      .then((data) => setStats(data))
+      .then((data) => setStats(data || {}))
       .catch((err) => console.error("Failed to fetch stats:", err));
   };
 

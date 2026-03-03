@@ -1,0 +1,16 @@
+[Unit]
+Description=Orchestro API Server
+After=network.target docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/orchestro/api
+ExecStart=/home/ubuntu/orchestro/api/main
+Restart=always
+RestartSec=5
+Environment=GIN_MODE=release
+
+[Install]
+WantedBy=multi-user.target

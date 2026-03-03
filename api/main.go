@@ -19,7 +19,7 @@ import (
 )
 
 func main() {
-	db, err := gorm.Open(sqlite.Open("orchestro.db"), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open("data/orchestro.db"), &gorm.Config{})
 	if err != nil {
 		log.Fatalf("failed to connect database: %v", err)
 	}
@@ -426,8 +426,12 @@ func main() {
 		})
 	}
 
-	log.Println("Orchestro API starting on :8080")
-	r.Run(":8080")
+	port := os.Getenv("PORT")
+	if port == "" {
+	    port = "3131"
+	}
+	log.Printf("Orchestro API starting on :%s", port)
+	r.Run(":" + port)
 }
 
 func handleDeploy(db *gorm.DB, orch *orchestrator.DockerOrchestrator, hub *Hub, project models.Project) {
@@ -479,68 +483,75 @@ func handleDeploy(db *gorm.DB, orch *orchestrator.DockerOrchestrator, hub *Hub, 
 	dockerfileName := "Dockerfile"
 	dockerfilePath := filepath.Join(workDir, dockerfileName)
 
-	forceBuild := project.BuildCommand != "" || project.InstallCommand != ""
-
-	if _, err := os.Stat(dockerfilePath); os.IsNotExist(err) || forceBuild {
-		fmt.Println("Generating Multi-stage Dockerfile...")
-		hub.BroadcastLogs(project.ID, "Generating build pipeline...\n")
-		installCmd := project.InstallCommand
-		if installCmd == "" {
-			installCmd = "bun install"
+	var err error
+	if project.CustomDockerfile != "" {
+		fmt.Println("Using custom Dockerfile...")
+		hub.BroadcastLogs(project.ID, "Using custom Dockerfile...\n")
+		err = os.WriteFile(dockerfilePath, []byte(project.CustomDockerfile), 0644)
+		if err != nil {
+			updateDeploymentStatus(db, &deployment, models.StatusFailed, "Failed to write custom Dockerfile: "+err.Error())
+			hub.BroadcastStatus(project.ID, string(models.StatusFailed), 0)
+			return
 		}
-		buildCmd := project.BuildCommand
+	} else {
+		forceBuild := project.BuildCommand != "" || project.InstallCommand != ""
 
-		buildStep := ""
-		if buildCmd != "" {
-			buildStep = fmt.Sprintf("RUN %s", buildCmd)
-		}
+		if _, statErr := os.Stat(dockerfilePath); os.IsNotExist(statErr) || forceBuild {
+			fmt.Println("Generating Multi-stage Dockerfile...")
+			hub.BroadcastLogs(project.ID, "Generating build pipeline...\n")
+			installCmd := project.InstallCommand
+			if installCmd == "" {
+				installCmd = "bun install"
+			}
+			buildCmd := project.BuildCommand
 
-		startCmd := project.StartCommand
-		if startCmd == "" {
-			startCmd = "bun run start"
-		}
+			buildStep := ""
+			if buildCmd != "" {
+				buildStep = fmt.Sprintf("RUN %s", buildCmd)
+			}
 
-		lockfile := "bun.lockb*"
-		if _, err := os.Stat(filepath.Join(workDir, "bun.lock")); err == nil {
-			lockfile = "bun.lock*"
-		}
+			startCmd := project.StartCommand
+			if startCmd == "" {
+				startCmd = "bun run start"
+			}
 
-		var buildArgsList []string
-		for _, ev := range project.EnvVars {
-			buildArgsList = append(buildArgsList, fmt.Sprintf("ARG %s\nENV %s=$%s", ev.Key, ev.Key, ev.Key))
-		}
-		envInject := strings.Join(buildArgsList, "\n")
+			lockfile := "bun.lockb*"
+			if _, err := os.Stat(filepath.Join(workDir, "bun.lock")); err == nil {
+				lockfile = "bun.lock*"
+			}
 
-		intPort := project.InternalPort
-		if intPort == 0 {
-			intPort = 80
-		}
+			var buildArgsList []string
+			for _, ev := range project.EnvVars {
+				buildArgsList = append(buildArgsList, fmt.Sprintf("ARG %s\nENV %s=$%s", ev.Key, ev.Key, ev.Key))
+			}
+			envInject := strings.Join(buildArgsList, "\n")
 
-		dockerfileContent := fmt.Sprintf(`
-# Build Stage
-FROM oven/bun:latest AS builder
+			intPort := project.InternalPort
+			if intPort == 0 {
+				intPort = 80
+			}
+
+			dockerfileContent := fmt.Sprintf(`
+FROM oven/bun:latest
+RUN apt-get update && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 %s
 COPY package.json %s ./
 RUN %s
 COPY . .
 %s
-
-# Production Stage
-FROM oven/bun:latest
-WORKDIR /app
-COPY --from=builder /app ./
 EXPOSE %d
 CMD ["sh", "-c", "%s"]
 `, envInject, lockfile, installCmd, buildStep, intPort, startCmd)
 
-		err = os.WriteFile(dockerfilePath, []byte(dockerfileContent), 0644)
-		if err != nil {
-			updateDeploymentStatus(db, &deployment, models.StatusFailed, "Failed to generate Dockerfile: "+err.Error())
-			hub.BroadcastStatus(project.ID, string(models.StatusFailed), 0)
-			return
+			err = os.WriteFile(dockerfilePath, []byte(dockerfileContent), 0644)
+			if err != nil {
+				updateDeploymentStatus(db, &deployment, models.StatusFailed, "Failed to generate Dockerfile: "+err.Error())
+				hub.BroadcastStatus(project.ID, string(models.StatusFailed), 0)
+				return
+			}
+			fmt.Println("Multi-stage Dockerfile generated successfully")
 		}
-		fmt.Println("Multi-stage Dockerfile generated successfully")
 	}
 
 	imageName := fmt.Sprintf("orchestro-p%d", project.ID)
@@ -621,7 +632,7 @@ func handleBackup(db *gorm.DB, project models.Project) (models.Backup, error) {
 	timestamp := time.Now().Format("20060102-150405")
 	backupPath := filepath.Join(backupDir, fmt.Sprintf("backup-%d-%s.tar.gz", project.ID, timestamp))
 
-	args := []string{"-czf", backupPath, "orchestro.db"}
+	args := []string{"-czf", backupPath, "data/orchestro.db"}
 
 	for _, v := range project.Volumes {
 		if _, err := os.Stat(v.HostPath); err == nil {
