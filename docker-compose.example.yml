@@ -5,5 +5,7 @@ services:
       dockerfile: ../Dockerfile.web
       args:
         - NEXT_PUBLIC_API_URL=https://api.orchestro.domain.com
+        - NEXT_PUBLIC_API_USER=orchestro-web
+        - NEXT_PUBLIC_API_PASS=PASSWORD
     ports:
       - "8181:3000"

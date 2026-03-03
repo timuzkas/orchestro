@@ -25,3 +25,4 @@ web/next-env.d.ts
 node_modules/
 dist/
 tmp/
+docker-compose.yml
