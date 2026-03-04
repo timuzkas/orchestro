@@ -405,12 +405,13 @@ export default function ProjectPage() {
           {[
             { id: "overview", label: "Overview", icon: Activity },
             { id: "logs", label: "Logs", icon: Terminal },
-            { id: "data", label: "Data Manager", icon: FileCode },
-            { id: "backups", label: "Backups", icon: Archive },
+            { id: "data", label: "Data Manager", icon: FileCode, beta: true },
+            { id: "backups", label: "Backups", icon: Archive, beta: true },
             { id: "settings", label: "Settings", icon: Settings },
           ].map((tab) => (
             <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center gap-2 pb-4 text-sm font-medium transition-colors relative ${activeTab === tab.id ? "text-white" : "text-zinc-500 hover:text-zinc-300"}`}>
               <tab.icon size={16} /> {tab.label}
+              {tab.beta && <span className="text-[8px] bg-zinc-800 text-zinc-400 px-1.5 py-0.5 rounded-full uppercase tracking-tighter ml-1">Beta</span>}
               {activeTab === tab.id && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white" />}
             </button>
           ))}
@@ -717,7 +718,11 @@ export default function ProjectPage() {
 
       <CustomModal isOpen={isVolumeModalOpen} onClose={() => setIsVolumeModalOpen(false)} title="Add Docker Volume">
         <form onSubmit={handleAddVolume} className="space-y-4">
-          <div><label className="block text-xs text-zinc-500 mb-1">Host Path (Machine)</label><input required type="text" value={newVolume.host_path} onChange={(e) => setNewVolume({ ...newVolume, host_path: e.target.value })} className="w-full bg-black border border-zinc-800 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-white transition-colors" placeholder="/home/user/data" /></div>
+          <div>
+            <label className="block text-xs text-zinc-500 mb-1">Host Path (Machine)</label>
+            <input required type="text" value={newVolume.host_path} onChange={(e) => setNewVolume({ ...newVolume, host_path: e.target.value })} className="w-full bg-black border border-zinc-800 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-white transition-colors" placeholder="/home/user/data" />
+            <p className="text-[9px] text-zinc-600 mt-1">Must be an <b>absolute path</b> (starts with /)</p>
+          </div>
           <div><label className="block text-xs text-zinc-500 mb-1">Container Path</label><input required type="text" value={newVolume.container_path} onChange={(e) => setNewVolume({ ...newVolume, container_path: e.target.value })} className="w-full bg-black border border-zinc-800 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-white transition-colors" placeholder="/app/data" /></div>
           <p className="text-[10px] text-zinc-600 leading-relaxed italic">Note: Changes will take effect after the next redeployment.</p>
           <button className="w-full bg-white text-black font-medium py-3 rounded-xl hover:bg-zinc-200 transition-colors mt-4">Add Volume</button>

@@ -758,19 +758,29 @@ func handleBackup(db *gorm.DB, project models.Project) (models.Backup, error) {
 	}
 
 	timestamp := time.Now().Format("20060102-150405")
+	tempDbPath := filepath.Join(os.TempDir(), fmt.Sprintf("orchestro-%s.db", timestamp))
 	backupPath := filepath.Join(backupDir, fmt.Sprintf("backup-%d-%s.tar.gz", project.ID, timestamp))
 
-	args := []string{"-czf", backupPath, "data/orchestro.db"}
+	// Create a safe copy of the database
+	if err := db.Exec(fmt.Sprintf("VACUUM INTO '%s'", tempDbPath)).Error; err != nil {
+		return models.Backup{}, fmt.Errorf("failed to vacuum database: %v", err)
+	}
+	defer os.Remove(tempDbPath)
 
+	args := []string{"-czf", backupPath, "-C", filepath.Dir(tempDbPath), filepath.Base(tempDbPath)}
+
+	// Add volumes
 	for _, v := range project.Volumes {
 		if _, err := os.Stat(v.HostPath); err == nil {
+			// We use absolute paths for volumes in tar to be safe, 
+			// but tar might warn about removing leading slash.
 			args = append(args, v.HostPath)
 		}
 	}
 
 	cmd := exec.Command("tar", args...)
 	if err := cmd.Run(); err != nil {
-		return models.Backup{}, fmt.Errorf("failed to create backup: %v", err)
+		return models.Backup{}, fmt.Errorf("failed to create backup tar: %v", err)
 	}
 
 	fileInfo, _ := os.Stat(backupPath)
