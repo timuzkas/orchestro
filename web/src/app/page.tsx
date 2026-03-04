@@ -224,23 +224,43 @@ export default function Home() {
       title: "Delete Project",
       message: "This will permanently remove the project and all associated data. This action cannot be undone.",
       onConfirm: async () => {
+        // Optimistic update: filter out the deleted project
+        setProjects(prev => prev.filter(p => p.id !== id));
+        setConfirmModal(null);
+        
         await apiFetch(`/api/v1/projects/${id}`, {
           method: "DELETE",
         });
-        setConfirmModal(null);
         fetchProjects();
       }
     });
   };
 
   const handleDeploy = async (projectId: number) => {
+    // Optimistic update: set status to building instantly
+    setProjects(prev => prev.map(p => {
+      if (p.id === projectId) {
+        const updatedDeployments = p.deployments ? [...p.deployments] : [];
+        if (updatedDeployments.length > 0) {
+          updatedDeployments[0] = { ...updatedDeployments[0], status: 'building' };
+        } else {
+          updatedDeployments.push({ id: 0, status: 'building', created_at: new Date().toISOString() });
+        }
+        return { ...p, deployments: updatedDeployments };
+      }
+      return p;
+    }));
+
     try {
       await apiFetch(`/api/v1/projects/${projectId}/deploy`, {
         method: "POST",
       });
+      // WebSocket will handle the real status update, 
+      // but we fetch anyway to ensure sync
       fetchProjects();
     } catch (err) {
       console.error("Failed to start deployment:", err);
+      fetchProjects(); // Revert on error
     }
   };
 

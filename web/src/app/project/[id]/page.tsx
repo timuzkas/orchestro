@@ -210,12 +210,24 @@ export default function ProjectPage() {
 
   const handleDeploy = async () => {
     setLogs("Starting deployment...\n");
+    // Optimistic update
+    setProject(prev => prev ? {
+      ...prev,
+      deployments: [{ id: 0, status: "building", created_at: new Date().toISOString() }, ...(prev.deployments || [])]
+    } : null);
+
     await apiFetch(`/api/v1/projects/${id}/deploy`, { method: "POST" });
     fetchProject();
   };
 
   const handlePause = async () => {
     setIsActionLoading(true);
+    // Optimistic update
+    setProject(prev => prev ? {
+      ...prev,
+      deployments: prev.deployments?.map((d, i) => i === 0 ? { ...d, status: "paused" } : d)
+    } : null);
+
     try {
       await apiFetch(`/api/v1/projects/${id}/pause`, { method: "POST" });
       fetchProject();
@@ -226,6 +238,12 @@ export default function ProjectPage() {
 
   const handleResume = async () => {
     setIsActionLoading(true);
+    // Optimistic update
+    setProject(prev => prev ? {
+      ...prev,
+      deployments: prev.deployments?.map((d, i) => i === 0 ? { ...d, status: "ready" } : d)
+    } : null);
+
     try {
       await apiFetch(`/api/v1/projects/${id}/resume`, { method: "POST" });
       fetchProject();
@@ -244,7 +262,7 @@ export default function ProjectPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(project),
       });
-      fetchProject();
+      // No re-fetch needed as state is already updated via inputs
     } finally {
       setIsSaving(false);
     }
@@ -253,14 +271,21 @@ export default function ProjectPage() {
   const handleAddEnv = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newEnv.key || !newEnv.value) return;
-    await apiFetch(`/api/v1/projects/${id}/env`, {
+    const res = await apiFetch(`/api/v1/projects/${id}/env`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(newEnv),
     });
-    setIsEnvModalOpen(false);
-    setNewEnv({ key: "", value: "" });
-    fetchProject();
+    
+    if (res.ok) {
+      const created = await res.json();
+      setProject(prev => prev ? {
+        ...prev,
+        env_vars: [...(prev.env_vars || []), created]
+      } : null);
+      setIsEnvModalOpen(false);
+      setNewEnv({ key: "", value: "" });
+    }
   };
 
   const handleDeleteEnv = async (envId: number) => {
@@ -269,9 +294,13 @@ export default function ProjectPage() {
       title: "Delete Variable",
       message: "Are you sure you want to delete this environment variable?",
       onConfirm: async () => {
-        await apiFetch(`/api/v1/projects/${id}/env/${envId}`, { method: "DELETE" });
+        // Optimistic delete
+        setProject(prev => prev ? {
+          ...prev,
+          env_vars: prev.env_vars?.filter(ev => ev.id !== envId)
+        } : null);
         setConfirmModal(null);
-        fetchProject();
+        await apiFetch(`/api/v1/projects/${id}/env/${envId}`, { method: "DELETE" });
       },
     });
   };
@@ -279,14 +308,21 @@ export default function ProjectPage() {
   const handleAddVolume = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newVolume.host_path || !newVolume.container_path) return;
-    await apiFetch(`/api/v1/projects/${id}/volumes`, {
+    const res = await apiFetch(`/api/v1/projects/${id}/volumes`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(newVolume),
     });
-    setIsVolumeModalOpen(false);
-    setNewVolume({ host_path: "", container_path: "" });
-    fetchProject();
+
+    if (res.ok) {
+      const created = await res.json();
+      setProject(prev => prev ? {
+        ...prev,
+        volumes: [...(prev.volumes || []), created]
+      } : null);
+      setIsVolumeModalOpen(false);
+      setNewVolume({ host_path: "", container_path: "" });
+    }
   };
 
   const handleDeleteVolume = async (volumeId: number) => {
@@ -295,9 +331,13 @@ export default function ProjectPage() {
       title: "Delete Volume",
       message: "Are you sure you want to remove this volume mapping?",
       onConfirm: async () => {
-        await apiFetch(`/api/v1/projects/${id}/volumes/${volumeId}`, { method: "DELETE" });
+        // Optimistic delete
+        setProject(prev => prev ? {
+          ...prev,
+          volumes: prev.volumes?.filter(v => v.id !== volumeId)
+        } : null);
         setConfirmModal(null);
-        fetchProject();
+        await apiFetch(`/api/v1/projects/${id}/volumes/${volumeId}`, { method: "DELETE" });
       },
     });
   };
