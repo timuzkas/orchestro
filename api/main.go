@@ -62,6 +62,45 @@ func main() {
 		})
 	})
 
+	// --- PUBLIC ENDPOINTS ---
+	public := r.Group("/api/v1")
+	{
+		public.GET("/webhooks/:id/:provider", func(c *gin.Context) {
+			c.String(200, "Orchestro Webhook Endpoint is active. Please use POST requests for triggers.")
+		})
+
+		public.POST("/webhooks/:id/:provider", func(c *gin.Context) {
+			id := c.Param("id")
+			provider := c.Param("provider")
+			var project models.Project
+			if err := db.Preload("EnvVars").First(&project, id).Error; err != nil {
+				c.JSON(404, gin.H{"error": "Project not found"})
+				return
+			}
+
+			trigger := false
+			if provider == "github" || provider == "gitlab" {
+				var payload struct {
+					Ref string `json:"ref"`
+				}
+				if err := c.ShouldBindJSON(&payload); err == nil {
+					branch := strings.TrimPrefix(payload.Ref, "refs/heads/")
+					if branch == project.WebhookBranch || project.WebhookBranch == "" {
+						trigger = true
+					}
+				}
+			}
+
+			if trigger {
+				c.JSON(202, gin.H{"message": "Deployment triggered"})
+				go handleDeploy(context.Background(), db, orch, hub, project)
+			} else {
+				c.JSON(200, gin.H{"message": "No action taken"})
+			}
+		})
+	}
+
+	// --- AUTHORIZED ENDPOINTS ---
 	authorized := r.Group("/")
 	apiUser := os.Getenv("API_USER")
 	apiPass := os.Getenv("API_PASS")
@@ -171,7 +210,7 @@ func main() {
 			}
 			if output == "" && n > 0 {
 				output = string(buf[:n])
-			} // Fallback
+			}
 
 			c.String(200, output)
 		})
@@ -237,7 +276,7 @@ func main() {
 				}
 			}
 
-			db.Select("Deployments", "EnvVars", "Backups").Unscoped().Delete(&project)
+			db.Select("Deployments", "EnvVars", "Backups", "Volumes").Unscoped().Delete(&project)
 			c.Status(204)
 		})
 
@@ -287,55 +326,10 @@ func main() {
 			c.Status(204)
 		})
 
-		v1.GET("/webhooks/:id/:provider", func(c *gin.Context) {
-			c.String(200, "Orchestro Webhook Endpoint is active. Please use POST requests for triggers.")
-		})
-
-		v1.POST("/webhooks/:id/:provider", func(c *gin.Context) {
-			id := c.Param("id")
-			provider := c.Param("provider")
-			var project models.Project
-			if err := db.Preload("EnvVars").First(&project, id).Error; err != nil {
-				c.JSON(404, gin.H{"error": "Project not found"})
-				return
-			}
-
-			trigger := false
-			if provider == "github" {
-				var payload struct {
-					Ref string `json:"ref"`
-				}
-				if err := c.ShouldBindJSON(&payload); err == nil {
-					branch := strings.TrimPrefix(payload.Ref, "refs/heads/")
-					if branch == project.WebhookBranch || project.WebhookBranch == "" {
-						trigger = true
-					}
-				}
-			} else if provider == "gitlab" {
-				var payload struct {
-					Ref string `json:"ref"`
-				}
-				if err := c.ShouldBindJSON(&payload); err == nil {
-					branch := strings.TrimPrefix(payload.Ref, "refs/heads/")
-					if branch == project.WebhookBranch || project.WebhookBranch == "" {
-						trigger = true
-					}
-				}
-			}
-
-			if trigger {
-
-				c.JSON(202, gin.H{"message": "Deployment triggered"})
-				go handleDeploy(context.Background(), db, orch, hub, project)
-			} else {
-				c.JSON(200, gin.H{"message": "No action taken"})
-			}
-		})
-
 		v1.POST("/projects/:id/backups", func(c *gin.Context) {
 			id := c.Param("id")
 			var project models.Project
-			if err := db.First(&project, id).Error; err != nil {
+			if err := db.Preload("Volumes").First(&project, id).Error; err != nil {
 				c.JSON(404, gin.H{"error": "Project not found"})
 				return
 			}
@@ -421,7 +415,6 @@ func main() {
 				return
 			}
 
-			// Stop and remove containers
 			for _, d := range project.Deployments {
 				if d.ContainerID != "" {
 					orch.StopContainer(context.Background(), d.ContainerID)
@@ -429,14 +422,12 @@ func main() {
 				}
 			}
 
-			// Delete project directory
 			projectDir := filepath.Join("data", "projects", fmt.Sprintf("%d", project.ID))
 			if err := os.RemoveAll(projectDir); err != nil {
 				c.JSON(500, gin.H{"error": "Failed to delete project data: " + err.Error()})
 				return
 			}
 
-			// Clear deployment status in DB
 			db.Model(&models.Deployment{}).Where("project_id = ?", project.ID).Update("status", "cleared")
 
 			c.JSON(200, gin.H{"message": "Project data cleared successfully"})
@@ -507,7 +498,7 @@ func main() {
 
 	port := os.Getenv("PORT")
 	if port == "" {
-	    port = "3131"
+		port = "3131"
 	}
 	log.Printf("Orchestro API starting on :%s", port)
 	r.Run(":" + port)
@@ -517,15 +508,12 @@ func handleDeploy(ctx context.Context, db *gorm.DB, orch *orchestrator.DockerOrc
 	defer func() {
 		cancelMutex.Lock()
 		if cancel, exists := deploymentCancels[project.ID]; exists {
-			// Check if we are cancelling OUR context
 			select {
 			case <-ctx.Done():
-				// This context is done, so it's safe to clear
 				delete(deploymentCancels, project.ID)
 			default:
-				// Context not done, it might be a new deployment that replaced us
 			}
-			_ = cancel // Use to avoid compiler error if not used, though it is
+			_ = cancel
 		}
 		cancelMutex.Unlock()
 	}()
@@ -603,55 +591,49 @@ func handleDeploy(ctx context.Context, db *gorm.DB, orch *orchestrator.DockerOrc
 			return
 		}
 	} else {
-		forceBuild := project.BuildCommand != "" || project.InstallCommand != ""
+		installCmd := project.InstallCommand
+		if installCmd == "" {
+			installCmd = "bun install"
+		}
+		buildCmd := project.BuildCommand
 
-		if _, statErr := os.Stat(dockerfilePath); os.IsNotExist(statErr) || forceBuild {
-			fmt.Println("Generating Multi-stage Dockerfile...")
-			hub.BroadcastLogs(project.ID, "Generating build pipeline...\n")
-			installCmd := project.InstallCommand
-			if installCmd == "" {
-				installCmd = "bun install"
-			}
-			buildCmd := project.BuildCommand
+		buildStep := ""
+		if buildCmd != "" {
+			buildStep = fmt.Sprintf("RUN %s", buildCmd)
+		}
 
-			buildStep := ""
-			if buildCmd != "" {
-				buildStep = fmt.Sprintf("RUN %s", buildCmd)
-			}
+		startCmd := project.StartCommand
+		if startCmd == "" {
+			startCmd = "bun run start"
+		}
 
-			startCmd := project.StartCommand
-			if startCmd == "" {
-				startCmd = "bun run start"
-			}
+		lockfile := "bun.lockb*"
+		if _, err := os.Stat(filepath.Join(workDir, "bun.lock")); err == nil {
+			lockfile = "bun.lock*"
+		}
 
-			lockfile := "bun.lockb*"
-			if _, err := os.Stat(filepath.Join(workDir, "bun.lock")); err == nil {
-				lockfile = "bun.lock*"
-			}
+		var buildArgsList []string
+		for _, ev := range project.EnvVars {
+			buildArgsList = append(buildArgsList, fmt.Sprintf("ARG %s\nENV %s=$%s", ev.Key, ev.Key, ev.Key))
+		}
+		envInject := strings.Join(buildArgsList, "\n")
 
-			var buildArgsList []string
-			for _, ev := range project.EnvVars {
-				buildArgsList = append(buildArgsList, fmt.Sprintf("ARG %s\nENV %s=$%s", ev.Key, ev.Key, ev.Key))
-			}
-			envInject := strings.Join(buildArgsList, "\n")
+		intPort := project.InternalPort
+		if intPort == 0 {
+			intPort = 80
+		}
 
-			intPort := project.InternalPort
-			if intPort == 0 {
-				intPort = 80
-			}
+		baseImage := project.BaseImage
+		if baseImage == "" {
+			baseImage = "oven/bun:latest"
+		}
 
-			baseImage := project.BaseImage
-			if baseImage == "" {
-				baseImage = "oven/bun:latest"
-			}
+		copyStep := ""
+		if _, err := os.Stat(filepath.Join(workDir, "package.json")); err == nil {
+			copyStep = fmt.Sprintf("COPY package.json %s ./", lockfile)
+		}
 
-			// Add conditional logic for copying lockfiles if they exist
-			copyStep := ""
-			if _, err := os.Stat(filepath.Join(workDir, "package.json")); err == nil {
-				copyStep = fmt.Sprintf("COPY package.json %s ./", lockfile)
-			}
-
-			dockerfileContent := fmt.Sprintf(`
+		dockerfileContent := fmt.Sprintf(`
 FROM %s
 WORKDIR /app
 ENV NODE_ENV=production
@@ -665,13 +647,11 @@ EXPOSE %d
 CMD ["sh", "-c", "%s"]
 `, baseImage, envInject, copyStep, installCmd, buildStep, intPort, startCmd)
 
-			err = os.WriteFile(dockerfilePath, []byte(dockerfileContent), 0644)
-			if err != nil {
-				updateDeploymentStatus(db, &deployment, models.StatusFailed, "Failed to generate Dockerfile: "+err.Error())
-				hub.BroadcastStatus(project.ID, string(models.StatusFailed), 0)
-				return
-			}
-			fmt.Println("Multi-stage Dockerfile generated successfully")
+		err = os.WriteFile(dockerfilePath, []byte(dockerfileContent), 0644)
+		if err != nil {
+			updateDeploymentStatus(db, &deployment, models.StatusFailed, "Failed to generate Dockerfile: "+err.Error())
+			hub.BroadcastStatus(project.ID, string(models.StatusFailed), 0)
+			return
 		}
 	}
 
@@ -708,7 +688,6 @@ CMD ["sh", "-c", "%s"]
 		fmt.Printf("Stopping old container %s for project %d\n", oldDep.ContainerID, project.ID)
 		orch.StopContainer(context.Background(), oldDep.ContainerID)
 		orch.RemoveContainer(context.Background(), oldDep.ContainerID)
-		// Clear container ID and update status in DB
 		db.Model(&oldDep).Updates(map[string]interface{}{
 			"container_id": "",
 			"status":       "outdated",
@@ -761,7 +740,6 @@ func handleBackup(db *gorm.DB, project models.Project) (models.Backup, error) {
 	tempDbPath := filepath.Join(os.TempDir(), fmt.Sprintf("orchestro-%s.db", timestamp))
 	backupPath := filepath.Join(backupDir, fmt.Sprintf("backup-%d-%s.tar.gz", project.ID, timestamp))
 
-	// Create a safe copy of the database
 	if err := db.Exec(fmt.Sprintf("VACUUM INTO '%s'", tempDbPath)).Error; err != nil {
 		return models.Backup{}, fmt.Errorf("failed to vacuum database: %v", err)
 	}
@@ -769,11 +747,8 @@ func handleBackup(db *gorm.DB, project models.Project) (models.Backup, error) {
 
 	args := []string{"-czf", backupPath, "-C", filepath.Dir(tempDbPath), filepath.Base(tempDbPath)}
 
-	// Add volumes
 	for _, v := range project.Volumes {
 		if _, err := os.Stat(v.HostPath); err == nil {
-			// We use absolute paths for volumes in tar to be safe, 
-			// but tar might warn about removing leading slash.
 			args = append(args, v.HostPath)
 		}
 	}
