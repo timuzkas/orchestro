@@ -75,7 +75,7 @@ func main() {
 			fmt.Printf("Webhook received: ID=%s, Provider=%s\n", id, provider)
 
 			var project models.Project
-			if err := db.Preload("EnvVars").First(&project, id).Error; err != nil {
+			if err := db.Preload("EnvVars").Preload("Volumes").First(&project, id).Error; err != nil {
 				fmt.Printf("Webhook error: Project %s not found\n", id)
 				c.JSON(404, gin.H{"error": "Project not found"})
 				return
@@ -371,7 +371,7 @@ func main() {
 		v1.POST("/projects/:id/deploy", func(c *gin.Context) {
 			id := c.Param("id")
 			var project models.Project
-			if err := db.Preload("EnvVars").First(&project, id).Error; err != nil {
+			if err := db.Preload("EnvVars").Preload("Volumes").First(&project, id).Error; err != nil {
 				c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
 				return
 			}
@@ -718,6 +718,7 @@ CMD ["sh", "-c", "%s"]
 
 	var volumes []string
 	for _, v := range project.Volumes {
+		fmt.Printf("Configuring volume: %s -> %s\n", v.HostPath, v.ContainerPath)
 		volumes = append(volumes, fmt.Sprintf("%s:%s", v.HostPath, v.ContainerPath))
 	}
 
