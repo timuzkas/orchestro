@@ -359,65 +359,76 @@ export default function ProjectPage() {
   return (
     <div className="min-h-screen bg-black text-white font-sans animate-backdrop-fade">
       <nav className="border-b border-zinc-900 p-4 sticky top-0 bg-black/80 backdrop-blur-md z-10">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-6">
-            <Link href="/" className="text-zinc-500 hover:text-white transition-colors">
+        <div className="max-w-6xl mx-auto flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 sm:gap-6 min-w-0">
+            <Link href="/" className="text-zinc-500 hover:text-white transition-colors shrink-0">
               <ArrowLeft size={20} />
             </Link>
-            <h1 className="text-2xl font-serif">{project.name}</h1>
-                        <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-900 border border-zinc-800 text-xs">
-                          <div
-                            className={`w-1.5 h-1.5 rounded-full ${currentStatus === "ready" || liveInfo?.state === "running" ? "bg-green-500" : "bg-zinc-500"}`}
-                          />
-                          <span className="capitalize">{currentStatus}</span>
-                        </div>
-            
+            <h1 className="text-xl sm:text-2xl font-serif truncate">{project.name}</h1>
+            <div className="flex items-center gap-2 px-2 sm:px-3 py-1 rounded-full bg-zinc-900 border border-zinc-800 text-[10px] sm:text-xs shrink-0">
+              <div
+                className={`w-1.5 h-1.5 rounded-full ${currentStatus === "ready" || liveInfo?.state === "running" ? "bg-green-500" : "bg-zinc-500"}`}
+              />
+              <span className="capitalize">{currentStatus}</span>
+            </div>
           </div>
-          <div className="flex gap-3">
+          <div className="flex gap-2 sm:gap-3 shrink-0">
             {currentStatus === "ready" ? (
               <button 
                 onClick={handlePause} 
                 disabled={isActionLoading} 
-                className="border border-zinc-800 px-4 py-1.5 rounded-full text-sm font-medium hover:bg-zinc-900 transition-colors flex items-center gap-2 disabled:opacity-50"
+                className="border border-zinc-800 px-3 sm:px-4 py-1.5 rounded-full text-sm font-medium hover:bg-zinc-900 transition-colors flex items-center gap-2 disabled:opacity-50"
+                title="Pause"
               >
                 {isActionLoading ? <RefreshCw size={16} className="animate-spin" /> : <Pause size={16} />}
-                {isActionLoading ? "Pausing..." : "Pause"}
+                <span className="hidden md:inline">{isActionLoading ? "Pausing..." : "Pause"}</span>
               </button>
             ) : currentStatus === "paused" ? (
               <button 
                 onClick={handleResume} 
                 disabled={isActionLoading} 
-                className="bg-zinc-900 border border-zinc-800 px-4 py-1.5 rounded-full text-sm font-medium hover:bg-zinc-800 transition-colors flex items-center gap-2 disabled:opacity-50"
+                className="bg-zinc-900 border border-zinc-800 px-3 sm:px-4 py-1.5 rounded-full text-sm font-medium hover:bg-zinc-800 transition-colors flex items-center gap-2 disabled:opacity-50"
+                title="Resume"
               >
                 {isActionLoading ? <RefreshCw size={16} className="animate-spin" /> : <Play size={16} />}
-                {isActionLoading ? "Resuming..." : "Resume"}
+                <span className="hidden md:inline">{isActionLoading ? "Resuming..." : "Resume"}</span>
               </button>
             ) : null}
             {currentStatus === "building" && (
               <button 
                 onClick={handleCancelDeployment} 
                 disabled={isActionLoading} 
-                className="bg-red-500/10 text-red-500 border border-red-500/20 px-4 py-1.5 rounded-full text-sm font-medium hover:bg-red-500/20 transition-all flex items-center gap-2 disabled:opacity-50"
+                className="bg-red-500/10 text-red-500 border border-red-500/20 px-3 sm:px-4 py-1.5 rounded-full text-sm font-medium hover:bg-red-500/20 transition-all flex items-center gap-2 disabled:opacity-50"
+                title="Abort"
               >
                 {isActionLoading ? <RefreshCw size={16} className="animate-spin" /> : <X size={16} />}
-                Abort
+                <span className="hidden md:inline">Abort</span>
               </button>
             )}
-            <button onClick={handleDeploy} disabled={currentStatus === "building"} className="bg-white text-black px-4 py-1.5 rounded-full text-sm font-medium hover:bg-zinc-200 transition-all flex items-center gap-2 disabled:opacity-50">
+            <button 
+              onClick={handleDeploy} 
+              disabled={currentStatus === "building"} 
+              className="bg-white text-black px-3 sm:px-4 py-1.5 rounded-full text-sm font-medium hover:bg-zinc-200 transition-all flex items-center gap-2 disabled:opacity-50"
+              title="Redeploy"
+            >
               <RefreshCw size={16} className={currentStatus === "building" ? "animate-spin" : ""} />
-              {currentStatus === "building" ? "Building..." : project.deployments?.length ? "Redeploy" : "Deploy"}
+              <span className="hidden md:inline">{currentStatus === "building" ? "Building..." : project.deployments?.length ? "Redeploy" : "Deploy"}</span>
             </button>
             {currentStatus === "ready" && (
-              <a href={externalUrl} className="border border-zinc-800 px-4 py-1.5 rounded-full text-sm font-medium hover:bg-zinc-900 transition-colors flex items-center gap-2">
-                <ExternalLink size={16} /> Open App
+              <a 
+                href={externalUrl} 
+                className="border border-zinc-800 px-3 sm:px-4 py-1.5 rounded-full text-sm font-medium hover:bg-zinc-900 transition-colors flex items-center gap-2"
+                title="Open App"
+              >
+                <ExternalLink size={16} /> <span className="hidden md:inline">Open App</span>
               </a>
             )}
           </div>
         </div>
       </nav>
 
-      <main className="max-w-6xl mx-auto p-8 animate-float-up">
-        <div className="flex gap-8 border-b border-zinc-900 mb-8">
+      <main className="max-w-6xl mx-auto p-4 sm:p-8 animate-float-up">
+        <div className="flex gap-4 sm:gap-8 border-b border-zinc-900 mb-8 overflow-x-auto scrollbar-hide scroll-smooth whitespace-nowrap">
           {[
             { id: "overview", label: "Overview", icon: Activity },
             { id: "logs", label: "Logs", icon: Terminal },
@@ -425,7 +436,7 @@ export default function ProjectPage() {
             { id: "backups", label: "Backups", icon: Archive, beta: true },
             { id: "settings", label: "Settings", icon: Settings },
           ].map((tab) => (
-            <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center gap-2 pb-4 text-sm font-medium transition-colors relative ${activeTab === tab.id ? "text-white" : "text-zinc-500 hover:text-zinc-300"}`}>
+            <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center gap-2 pb-4 text-sm font-medium transition-colors relative shrink-0 ${activeTab === tab.id ? "text-white" : "text-zinc-500 hover:text-zinc-300"}`}>
               <tab.icon size={16} /> {tab.label}
               {tab.beta && <span className="text-[8px] bg-zinc-800 text-zinc-400 px-1.5 py-0.5 rounded-full uppercase tracking-tighter ml-1">Beta</span>}
               {activeTab === tab.id && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white" />}
@@ -435,26 +446,26 @@ export default function ProjectPage() {
 
         <div className="mt-8">
           {activeTab === "overview" && (
-            <div className="grid grid-cols-3 gap-6">
-              <div className="col-span-2 space-y-6">
-                <div className="bg-zinc-950 border border-zinc-900 rounded-3xl p-8">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2 space-y-6">
+                <div className="bg-zinc-950 border border-zinc-900 rounded-3xl p-6 sm:p-8">
                   <h3 className="text-xl font-serif mb-4 text-zinc-300">Deployment Details</h3>
                   <div className="space-y-4">
-                    <div className="flex justify-between border-b border-zinc-900 pb-4">
-                      <span className="text-zinc-500">Repository</span>
-                      <a href={project.repo_url} className="flex items-center gap-1 text-zinc-300 hover:text-white">{project.repo_url} <Github size={14} /></a>
+                    <div className="flex flex-col sm:flex-row sm:justify-between border-b border-zinc-900 pb-4 gap-2">
+                      <span className="text-zinc-500 shrink-0">Repository</span>
+                      <a href={project.repo_url} className="flex items-center gap-1 text-zinc-300 hover:text-white break-all text-sm sm:text-base">{project.repo_url} <Github size={14} className="shrink-0" /></a>
                     </div>
-                    <div className="flex justify-between border-b border-zinc-900 pb-4">
-                      <span className="text-zinc-500">Branch</span>
+                    <div className="flex flex-col sm:flex-row sm:justify-between border-b border-zinc-900 pb-4 gap-2">
+                      <span className="text-zinc-500 shrink-0">Branch</span>
                       <span className="text-zinc-300">{project.branch}</span>
                     </div>
-                    <div className="flex justify-between border-b border-zinc-900 pb-4">
-                      <span className="text-zinc-500">Build Command</span>
-                      {project.build_command ? <code className="bg-black px-2 py-0.5 rounded text-zinc-400">{project.build_command}</code> : <span className="text-zinc-600 italic text-sm">No build step required</span>}
+                    <div className="flex flex-col sm:flex-row sm:justify-between border-b border-zinc-900 pb-4 gap-2">
+                      <span className="text-zinc-500 shrink-0">Build Command</span>
+                      {project.build_command ? <code className="bg-black px-2 py-1 rounded text-zinc-400 text-xs sm:text-sm break-all">{project.build_command}</code> : <span className="text-zinc-600 italic text-sm">No build step required</span>}
                     </div>
-                    <div className="flex justify-between border-b border-zinc-900 pb-4">
-                      <span className="text-zinc-500">Start Command</span>
-                      <code className="bg-black px-2 py-0.5 rounded text-zinc-400">{project.start_command || "bun run start"}</code>
+                    <div className="flex flex-col sm:flex-row sm:justify-between border-b border-zinc-900 pb-4 gap-2">
+                      <span className="text-zinc-500 shrink-0">Start Command</span>
+                      <code className="bg-black px-2 py-1 rounded text-zinc-400 text-xs sm:text-sm break-all">{project.start_command || "bun run start"}</code>
                     </div>
                   </div>
                 </div>
@@ -516,14 +527,14 @@ export default function ProjectPage() {
 
           {activeTab === "data" && (
             <div className="space-y-8 animate-modal-enter pb-20">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <div className="bg-zinc-950 border border-zinc-900 rounded-3xl p-6 flex flex-col h-[400px]">
                   <div className="flex justify-between items-center mb-6">
                     <div className="flex items-center gap-2"><Terminal size={18} className="text-zinc-500" /><h3 className="text-lg font-serif">Environment</h3></div>
                     <button onClick={() => setIsEnvModalOpen(true)} className="text-[10px] uppercase tracking-widest font-bold bg-white/5 border border-white/10 px-3 py-1.5 rounded-lg hover:bg-white/10 transition-colors">Add Var</button>
                   </div>
                   <div className="space-y-2 overflow-y-auto pr-2 flex-1 scrollbar-hide">
-                    {project.env_vars?.length === 0 ? <div className="h-full flex items-center justify-center border border-dashed border-zinc-900 rounded-2xl italic text-zinc-600 text-xs">No variables defined</div> : project.env_vars?.map((ev: EnvVar) => (
+                    {project.env_vars?.length === 0 ? <div className="h-full flex items-center justify-center border border-dashed border-zinc-900 rounded-2xl italic text-zinc-600 text-xs text-center p-4">No variables defined</div> : project.env_vars?.map((ev: EnvVar) => (
                       <div key={ev.id} className="flex justify-between items-center bg-black/40 border border-zinc-900 p-3 rounded-xl group transition-colors hover:border-zinc-800">
                         <div className="flex flex-col gap-0.5 overflow-hidden"><span className="text-[10px] text-zinc-600 font-bold uppercase tracking-tighter">Key</span><code className="text-zinc-400 text-[11px] font-mono truncate">{ev.key}</code></div>
                         <button onClick={() => handleDeleteEnv(ev.id)} className="p-2 text-zinc-700 hover:text-red-500 transition-colors"><X size={14} /></button>
@@ -537,7 +548,7 @@ export default function ProjectPage() {
                     <button onClick={() => setIsVolumeModalOpen(true)} className="text-[10px] uppercase tracking-widest font-bold bg-white/5 border border-white/10 px-3 py-1.5 rounded-lg hover:bg-white/10 transition-colors">Add Mount</button>
                   </div>
                   <div className="space-y-2 overflow-y-auto pr-2 flex-1 scrollbar-hide">
-                    {project.volumes?.length === 0 ? <div className="h-full flex items-center justify-center border border-dashed border-zinc-900 rounded-2xl italic text-zinc-600 text-xs">No persistent volumes</div> : project.volumes?.map((v: Volume) => (
+                    {project.volumes?.length === 0 ? <div className="h-full flex items-center justify-center border border-dashed border-zinc-900 rounded-2xl italic text-zinc-600 text-xs text-center p-4">No persistent volumes</div> : project.volumes?.map((v: Volume) => (
                       <div key={v.id} className="bg-black/40 border border-zinc-900 p-3 rounded-xl group transition-colors hover:border-zinc-800 relative">
                         <div className="flex flex-col gap-2 overflow-hidden">
                           <div className="flex items-center gap-2"><div className="w-1 h-1 rounded-full bg-zinc-700" /><code className="text-[10px] text-zinc-500 truncate">{v.host_path}</code></div>
@@ -548,7 +559,7 @@ export default function ProjectPage() {
                     ))}
                   </div>
                 </div>
-                <div className="bg-zinc-950 border border-zinc-900 rounded-3xl p-6 flex flex-col h-[400px]">
+                <div className="bg-zinc-950 border border-zinc-900 rounded-3xl p-6 flex flex-col h-[400px] md:col-span-2 lg:col-span-1">
                   <div className="flex items-center gap-2 mb-6"><FileCode size={18} className="text-zinc-500" /><h3 className="text-lg font-serif">Custom Dockerfile</h3></div>
                   <div className="relative flex-1 group">
                     <textarea value={project.custom_dockerfile || ""} onChange={(e) => setProject({ ...project, custom_dockerfile: e.target.value })} className="w-full h-full bg-black border border-zinc-900 rounded-2xl p-4 font-mono text-[10px] text-zinc-500 focus:outline-none focus:border-zinc-700 resize-none scrollbar-hide transition-colors" placeholder="Override auto-generated Dockerfile. Leave empty to use default..." />
@@ -557,16 +568,16 @@ export default function ProjectPage() {
                 </div>
               </div>
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                <div className="lg:col-span-8 bg-zinc-950 border border-zinc-900 rounded-3xl p-8">
+                <div className="lg:col-span-8 bg-zinc-950 border border-zinc-900 rounded-3xl p-6 sm:p-8">
                   <div className="flex items-center justify-between mb-8">
                     <div className="flex items-center gap-3"><Activity size={20} className="text-zinc-500" /><h3 className="text-xl font-serif">Deployment History</h3></div>
-                    <span className="text-[10px] text-zinc-600 uppercase font-bold tracking-widest">{project.deployments?.length || 0} Records</span>
+                    <span className="text-[10px] text-zinc-600 uppercase font-bold tracking-widest shrink-0">{project.deployments?.length || 0} Records</span>
                   </div>
                   <div className="space-y-3">
                     {project.deployments?.length === 0 ? <div className="py-12 text-center text-zinc-700 italic bg-black/20 border border-dashed border-zinc-900 rounded-2xl">No deployment history available</div> : project.deployments?.slice(0, 5).map((d: Deployment) => (
-                      <div key={d.id} className="flex justify-between items-center bg-black/40 border border-zinc-900 p-4 rounded-2xl group hover:border-zinc-800 transition-colors">
+                      <div key={d.id} className="flex flex-col sm:flex-row sm:justify-between sm:items-center bg-black/40 border border-zinc-900 p-4 rounded-2xl group hover:border-zinc-800 transition-colors gap-4">
                         <div className="flex items-center gap-4">
-                          <div className={`w-2 h-2 rounded-full ${d.status === "ready" ? "bg-green-500" : d.status === "failed" ? "bg-red-500" : "bg-zinc-700"}`} />
+                          <div className={`w-2 h-2 rounded-full shrink-0 ${d.status === "ready" ? "bg-green-500" : d.status === "failed" ? "bg-red-500" : "bg-zinc-700"}`} />
                           <div><p className="text-sm font-medium capitalize text-zinc-300">{d.status}</p><p className="text-[10px] text-zinc-600 font-mono">{new Date(d.created_at).toLocaleString()}</p></div>
                         </div>
                         <button onClick={() => { if (d.logs) setLogs(d.logs); setActiveTab("logs"); }} className="text-[10px] uppercase font-bold text-zinc-500 group-hover:text-white transition-colors flex items-center gap-2"><Terminal size={14} /> Inspect Logs</button>
@@ -575,7 +586,7 @@ export default function ProjectPage() {
                   </div>
                 </div>
                 <div className="lg:col-span-4 space-y-6">
-                  <div className="bg-zinc-950 border border-zinc-900 rounded-3xl p-8 opacity-40 grayscale pointer-events-none h-full">
+                  <div className="bg-zinc-950 border border-zinc-900 rounded-3xl p-6 sm:p-8 opacity-40 grayscale pointer-events-none h-full">
                     <h3 className="text-lg font-serif mb-4">Workspace</h3>
                     <div className="py-8 text-center border border-dashed border-zinc-800 rounded-2xl"><Package size={32} className="mx-auto text-zinc-800 mb-2" /><p className="text-[10px] uppercase font-bold text-zinc-700">Storage Explorer</p><p className="text-[9px] text-zinc-800 mt-1">Coming in V2</p></div>
                   </div>
@@ -585,16 +596,16 @@ export default function ProjectPage() {
           )}
 
           {activeTab === "backups" && (
-            <div className="bg-zinc-950 border border-zinc-900 rounded-3xl p-8 animate-modal-enter">
-              <div className="flex justify-between items-center mb-8">
+            <div className="bg-zinc-950 border border-zinc-900 rounded-3xl p-6 sm:p-8 animate-modal-enter">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-6 mb-8">
                 <div><h3 className="text-2xl font-serif">Project Backups</h3><p className="text-zinc-500 text-sm mt-1">Manual snapshots of your database and volumes.</p></div>
-                <button onClick={handleCreateBackup} className="bg-white text-black px-6 py-2 rounded-full font-medium hover:bg-zinc-200 transition-colors">Create Backup</button>
+                <button onClick={handleCreateBackup} className="bg-white text-black px-6 py-2 rounded-full font-medium hover:bg-zinc-200 transition-colors w-full sm:w-auto">Create Backup</button>
               </div>
               <div className="space-y-4">
                 {project.backups?.length === 0 ? <div className="py-20 text-center text-zinc-600">No backups created yet.</div> : project.backups?.map((b: Backup) => (
-                  <div key={b.id} className="flex justify-between items-center bg-zinc-900/30 border border-zinc-900 p-4 rounded-2xl">
-                    <div className="flex items-center gap-4"><Archive className="text-zinc-500" size={20} /><div><p className="text-sm font-medium">{new Date(b.created_at).toLocaleString()}</p><p className="text-xs text-zinc-500">{(b.size / 1024 / 1024).toFixed(2)} MB</p></div></div>
-                    <a href={`${API_URL}/api/v1/backups/${b.id}/download`} download className="text-xs text-zinc-400 hover:text-white transition-colors bg-white/5 border border-white/10 px-3 py-1 rounded-lg">Download</a>
+                  <div key={b.id} className="flex flex-col sm:flex-row sm:justify-between sm:items-center bg-zinc-900/30 border border-zinc-900 p-4 rounded-2xl gap-4">
+                    <div className="flex items-center gap-4"><Archive className="text-zinc-500" size={20} /><div className="min-w-0"><p className="text-sm font-medium truncate">{new Date(b.created_at).toLocaleString()}</p><p className="text-xs text-zinc-500">{(b.size / 1024 / 1024).toFixed(2)} MB</p></div></div>
+                    <a href={`${API_URL}/api/v1/backups/${b.id}/download`} download className="text-xs text-zinc-400 hover:text-white transition-colors bg-white/5 border border-white/10 px-3 py-1 rounded-lg text-center">Download</a>
                   </div>
                 ))}
               </div>
@@ -603,7 +614,7 @@ export default function ProjectPage() {
 
           {activeTab === "settings" && (
             <div className="space-y-12 pb-20 animate-modal-enter">
-              <div className="bg-zinc-950 border border-zinc-900 rounded-3xl p-8 max-w-3xl">
+              <div className="bg-zinc-950 border border-zinc-900 rounded-3xl p-6 sm:p-8 max-w-3xl">
                                 <div className="flex items-center gap-3 mb-8">
                                   <Github size={20} className="text-zinc-500" />
                                   <div>
@@ -615,7 +626,7 @@ export default function ProjectPage() {
                                 </div>
                 
                 <form onSubmit={handleUpdateProject} className="space-y-6">
-                  <div className="grid grid-cols-3 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     <div className="space-y-1.5"><label className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold ml-1">Repository URL</label><input type="text" value={project.repo_url || ""} onChange={(e) => setProject({ ...project, repo_url: e.target.value })} className="w-full bg-black border border-zinc-900 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-white transition-colors" /></div>
                     <div className="space-y-1.5"><label className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold ml-1">Branch</label><input type="text" value={project.branch || ""} onChange={(e) => setProject({ ...project, branch: e.target.value })} className="w-full bg-black border border-zinc-900 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-white transition-colors" /></div>
                     <div className="space-y-1.5"><label className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold ml-1">Base Image</label><input type="text" value={project.base_image || ""} onChange={(e) => setProject({ ...project, base_image: e.target.value })} className="w-full bg-black border border-zinc-900 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-white transition-colors" /></div>
@@ -635,24 +646,24 @@ export default function ProjectPage() {
                                         </div>
                                       </div>
                   
-                    <div className="grid grid-cols-2 gap-6 mb-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
                       <div className="space-y-1.5"><label className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold ml-1">Install Cmd</label><input type="text" value={project.install_command || ""} onChange={(e) => setProject({ ...project, install_command: e.target.value })} className="w-full bg-black border border-zinc-900 rounded-xl px-4 py-2.5 text-xs font-mono focus:outline-none focus:border-white transition-colors" /></div>
                       <div className="space-y-1.5"><label className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold ml-1">Build Cmd</label><input type="text" value={project.build_command || ""} onChange={(e) => setProject({ ...project, build_command: e.target.value })} className="w-full bg-black border border-zinc-900 rounded-xl px-4 py-2.5 text-xs font-mono focus:outline-none focus:border-white transition-colors" /></div>
                     </div>
-                    <div className="grid grid-cols-2 gap-6 mb-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
                       <div className="space-y-1.5"><label className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold ml-1">Start Cmd</label><input type="text" value={project.start_command || ""} onChange={(e) => setProject({ ...project, start_command: e.target.value })} className="w-full bg-black border border-zinc-900 rounded-xl px-4 py-2.5 text-xs font-mono focus:outline-none focus:border-white transition-colors" /></div>
                       <div className="space-y-1.5"><label className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold ml-1">Output Dir</label><input type="text" value={project.output_directory || ""} onChange={(e) => setProject({ ...project, output_directory: e.target.value })} className="w-full bg-black border border-zinc-900 rounded-xl px-4 py-2.5 text-xs font-mono focus:outline-none focus:border-white transition-colors" /></div>
                     </div>
-                    <div className="grid grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                       <div className="space-y-1.5"><label className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold ml-1">Public Port</label><input type="number" value={project.custom_port || ""} onChange={(e) => setProject({ ...project, custom_port: parseInt(e.target.value) || 0 })} placeholder="Auto" className="w-full bg-black border border-zinc-900 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-white transition-colors" /></div>
                       <div className="space-y-1.5"><label className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold ml-1">Internal Port</label><input type="number" value={project.internal_port || ""} onChange={(e) => setProject({ ...project, internal_port: parseInt(e.target.value) || 0 })} placeholder="80" className="w-full bg-black border border-zinc-900 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-white transition-colors" /></div>
                     </div>
                   </div>
-                  <div className="pt-6"><button disabled={isSaving} className="bg-white text-black px-8 py-3 rounded-2xl text-sm font-bold hover:bg-zinc-200 transition-all active:scale-95 disabled:opacity-50">{isSaving ? "Updating Project..." : "Save All Changes"}</button></div>
+                  <div className="pt-6"><button disabled={isSaving} className="bg-white text-black px-8 py-3 rounded-2xl text-sm font-bold hover:bg-zinc-200 transition-all active:scale-95 disabled:opacity-50 w-full sm:w-auto">{isSaving ? "Updating Project..." : "Save All Changes"}</button></div>
                 </form>
               </div>
 
-                            <div className="bg-zinc-950 border border-zinc-900 rounded-3xl p-8 max-w-3xl">
+                            <div className="bg-zinc-950 border border-zinc-900 rounded-3xl p-6 sm:p-8 max-w-3xl">
 
                               <div className="flex items-center gap-3 mb-8">
 
@@ -674,7 +685,7 @@ export default function ProjectPage() {
 
               
                 <div className="space-y-6">
-                  <div className="grid grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                     <div className="space-y-1.5">
                       <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold ml-1">Provider</label>
                       <div className="relative group">
@@ -699,25 +710,25 @@ export default function ProjectPage() {
                     <p className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold mb-2 ml-1">
                       Target Webhook URL
                     </p>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
                       <code className="flex-1 text-sm text-zinc-400 break-all font-mono leading-relaxed">
                         {`${API_URL}/api/v1/webhooks/${id}/${project.git_provider || "provider"}`}
                       </code>
                     </div>
                   </div>
                   
-                  <button onClick={() => handleUpdateProject()} disabled={isSaving} className="text-xs bg-zinc-900 border border-zinc-800 px-6 py-2.5 rounded-xl font-medium hover:bg-zinc-800 transition-all active:scale-95">Update Webhook</button>
+                  <button onClick={() => handleUpdateProject()} disabled={isSaving} className="text-xs bg-zinc-900 border border-zinc-800 px-6 py-2.5 rounded-xl font-medium hover:bg-zinc-800 transition-all active:scale-95 w-full sm:w-auto">Update Webhook</button>
                 </div>
               </div>
 
-              <div className="bg-red-500/5 border border-red-500/10 rounded-3xl p-8 max-w-3xl flex justify-between items-center mb-6">
+              <div className="bg-red-500/5 border border-red-500/10 rounded-3xl p-6 sm:p-8 max-w-3xl flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-6">
                 <div><h3 className="text-xl font-serif text-red-500">Reset Local State</h3><p className="text-xs text-zinc-500 mt-1">Delete all project files, logs, and reset the environment.</p></div>
-                <button onClick={handleClearData} className="bg-red-500/10 text-red-500 border border-red-500/20 px-6 py-2.5 rounded-xl hover:bg-red-500/20 transition-all active:scale-95 text-xs font-bold">Clear Project Data</button>
+                <button onClick={handleClearData} className="bg-red-500/10 text-red-500 border border-red-500/20 px-6 py-2.5 rounded-xl hover:bg-red-500/20 transition-all active:scale-95 text-xs font-bold w-full sm:w-auto">Clear Project Data</button>
               </div>
 
-              <div className="bg-red-500/5 border border-red-500/10 rounded-3xl p-8 max-w-3xl flex justify-between items-center">
+              <div className="bg-red-500/5 border border-red-500/10 rounded-3xl p-6 sm:p-8 max-w-3xl flex flex-col sm:flex-row sm:justify-between sm:items-center gap-6">
                 <div><h3 className="text-xl font-serif text-red-500">Danger Zone</h3><p className="text-xs text-zinc-500 mt-1">Delete project, logs, and containers forever.</p></div>
-                <button onClick={() => setConfirmModal({ isOpen: true, title: "Delete Project", variant: "danger", message: "This will permanently remove the project and all associated data. This action cannot be undone.", onConfirm: async () => { await apiFetch(`/api/v1/projects/${id}`, { method: "DELETE" }); router.push("/"); } })} className="bg-red-500/10 text-red-500 border border-red-500/20 px-6 py-2.5 rounded-xl hover:bg-red-500/20 transition-all active:scale-95 text-xs font-bold">Delete Project</button>
+                <button onClick={() => setConfirmModal({ isOpen: true, title: "Delete Project", variant: "danger", message: "This will permanently remove the project and all associated data. This action cannot be undone.", onConfirm: async () => { await apiFetch(`/api/v1/projects/${id}`, { method: "DELETE" }); router.push("/"); } })} className="bg-red-500/10 text-red-500 border border-red-500/20 px-6 py-2.5 rounded-xl hover:bg-red-500/20 transition-all active:scale-95 text-xs font-bold w-full sm:w-auto">Delete Project</button>
               </div>
             </div>
           )}
