@@ -144,16 +144,44 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    fetchProjects();
+    let ws: WebSocket | null = null;
+    let pollInterval: NodeJS.Timeout;
+    let reconnectTimeout: NodeJS.Timeout;
 
-    // WebSocket for real-time updates
-    const ws = new WebSocket(getWsUrl());
-    ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      if (data.type === "status") fetchProjects();
+    const connect = () => {
+      if (ws) ws.close();
+      ws = new WebSocket(getWsUrl());
+      
+      ws.onopen = () => {
+        if (pollInterval) clearInterval(pollInterval);
+      };
+
+      ws.onclose = () => {
+        // Start polling fallback if WS is down
+        if (!pollInterval) {
+          pollInterval = setInterval(fetchProjects, 10000);
+        }
+        reconnectTimeout = setTimeout(connect, 5000);
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === "status") fetchProjects();
+        } catch (e) {
+          console.error("WS error:", e);
+        }
+      };
     };
 
-    return () => ws.close();
+    fetchProjects();
+    connect();
+
+    return () => {
+      if (ws) ws.close();
+      if (pollInterval) clearInterval(pollInterval);
+      clearTimeout(reconnectTimeout);
+    };
   }, [fetchProjects]);
 
   const handleCreateProject = async (e: React.FormEvent) => {

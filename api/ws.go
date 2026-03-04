@@ -5,8 +5,13 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
+)
+
+const (
+	pingPeriod = 30 * time.Second
 )
 
 var upgrader = websocket.Upgrader{
@@ -31,6 +36,9 @@ func newHub() *Hub {
 }
 
 func (h *Hub) run() {
+	ticker := time.NewTicker(pingPeriod)
+	defer ticker.Stop()
+
 	for {
 		select {
 		case client := <-h.register:
@@ -49,6 +57,15 @@ func (h *Hub) run() {
 			for client := range h.clients {
 				err := client.WriteMessage(websocket.TextMessage, message)
 				if err != nil {
+					client.Close()
+					delete(h.clients, client)
+				}
+			}
+			h.mu.Unlock()
+		case <-ticker.C:
+			h.mu.Lock()
+			for client := range h.clients {
+				if err := client.WriteMessage(websocket.PingMessage, nil); err != nil {
 					client.Close()
 					delete(h.clients, client)
 				}
@@ -84,4 +101,14 @@ func serveWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	hub.register <- conn
+
+	go func() {
+		defer func() { hub.unregister <- conn }()
+		for {
+			// Read loop is required to handle pong responses and detect disconnects
+			if _, _, err := conn.ReadMessage(); err != nil {
+				break
+			}
+		}
+	}()
 }

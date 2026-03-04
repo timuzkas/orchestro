@@ -152,28 +152,44 @@ export default function ProjectPage() {
   }, [id, logs]);
 
   useEffect(() => {
-    fetchProject();
-    let ws: WebSocket;
+    let ws: WebSocket | null = null;
     let reconnectTimeout: NodeJS.Timeout;
+    let pollInterval: NodeJS.Timeout;
+
     const connect = () => {
+      if (ws) ws.close();
       ws = new WebSocket(getWsUrl());
-      ws.onopen = () => setWsConnected(true);
+      ws.onopen = () => {
+        setWsConnected(true);
+        if (pollInterval) clearInterval(pollInterval);
+      };
       ws.onclose = () => {
         setWsConnected(false);
+        // Start polling fallback if WS is down
+        if (!pollInterval) {
+          pollInterval = setInterval(fetchProject, 5000);
+        }
         reconnectTimeout = setTimeout(connect, 3000);
       };
       ws.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        if (data.project_id === Number(id)) {
-          if (data.type === "log") setLogs((prev) => prev + data.log);
-          else if (data.type === "status") fetchProject();
+        try {
+          const data = JSON.parse(event.data);
+          if (data.project_id === Number(id)) {
+            if (data.type === "log") setLogs((prev) => prev + data.log);
+            else if (data.type === "status") fetchProject();
+          }
+        } catch (e) {
+          console.error("WS error:", e);
         }
       };
     };
+
     connect();
+
     return () => {
       if (ws) ws.close();
       clearTimeout(reconnectTimeout);
+      if (pollInterval) clearInterval(pollInterval);
     };
   }, [id, fetchProject]);
 
