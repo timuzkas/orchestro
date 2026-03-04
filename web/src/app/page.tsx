@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Plus, ExternalLink, Package, X, Settings, RefreshCw } from "lucide-react";
+import { Plus, ExternalLink, Package, X, Settings, RefreshCw, ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { apiFetch, getWsUrl } from "@/lib/api";
 
@@ -432,14 +432,19 @@ export default function Home() {
               <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-1.5">
                   <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold ml-1">Stack Preset</label>
-                  <select
-                    onChange={(e) => handleStackChange(e.target.value)}
-                    className="w-full bg-black border border-zinc-900 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-white appearance-none transition-colors"
-                  >
-                    {Object.entries(STACK_PRESETS).map(([key, preset]) => (
-                      <option key={key} value={key}>{preset.name}</option>
-                    ))}
-                  </select>
+                  <div className="relative group">
+                    <select
+                      onChange={(e) => handleStackChange(e.target.value)}
+                      className="w-full bg-black border border-zinc-900 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-white appearance-none transition-colors cursor-pointer pr-10"
+                    >
+                      {Object.entries(STACK_PRESETS).map(([key, preset]) => (
+                        <option key={key} value={key}>{preset.name}</option>
+                      ))}
+                    </select>
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-500 group-focus-within:text-white transition-colors">
+                      <ChevronDown size={16} />
+                    </div>
+                  </div>
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold ml-1">Base Image</label>

@@ -16,6 +16,7 @@ import {
   Pause,
   Play,
   Package,
+  ChevronDown,
 } from "lucide-react";
 import Link from "next/link";
 import { apiFetch, getWsUrl, API_URL } from "@/lib/api";
@@ -657,7 +658,23 @@ export default function ProjectPage() {
               
                 <div className="space-y-6">
                   <div className="grid grid-cols-2 gap-6">
-                    <div className="space-y-1.5"><label className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold ml-1">Provider</label><select value={project.git_provider || ""} onChange={(e) => setProject({ ...project, git_provider: e.target.value })} className="w-full bg-black border border-zinc-900 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-white appearance-none transition-colors"><option value="">None</option><option value="github">GitHub</option><option value="gitlab">GitLab</option></select></div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold ml-1">Provider</label>
+                      <div className="relative group">
+                        <select
+                          value={project.git_provider || ""}
+                          onChange={(e) => setProject({ ...project, git_provider: e.target.value })}
+                          className="w-full bg-black border border-zinc-900 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-white appearance-none transition-colors cursor-pointer pr-10"
+                        >
+                          <option value="">None</option>
+                          <option value="github">GitHub</option>
+                          <option value="gitlab">GitLab</option>
+                        </select>
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-500 group-focus-within:text-white transition-colors">
+                          <ChevronDown size={16} />
+                        </div>
+                      </div>
+                    </div>
                     <div className="space-y-1.5"><label className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold ml-1">Watch Branch</label><input type="text" value={project.webhook_branch || ""} onChange={(e) => setProject({ ...project, webhook_branch: e.target.value })} placeholder="main" className="w-full bg-black border border-zinc-900 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-white transition-colors" /></div>
                   </div>
                   <div className="space-y-1.5"><label className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold ml-1">Webhook Secret</label><input type="password" value={project.webhook_secret || ""} onChange={(e) => setProject({ ...project, webhook_secret: e.target.value })} placeholder="••••••••••••••••" className="w-full bg-black border border-zinc-900 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-white transition-colors" /></div>
