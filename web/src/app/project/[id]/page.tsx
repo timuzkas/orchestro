@@ -184,6 +184,7 @@ export default function ProjectPage() {
       };
     };
 
+    fetchProject();
     connect();
 
     return () => {
