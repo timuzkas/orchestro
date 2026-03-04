@@ -144,12 +144,18 @@ export default function ProjectPage() {
       const data = await res.json();
       setProject(data.project || null);
       setLiveInfo(data.live || { state: "unknown", memory: 0 });
-      if (data.project?.deployments?.[0]?.logs && logs === "")
-        setLogs(data.project.deployments[0].logs || "");
+      
+      // Use functional update to avoid dependency on 'logs' state
+      setLogs((prev) => {
+        if (prev === "" && data.project?.deployments?.[0]?.logs) {
+          return data.project.deployments[0].logs;
+        }
+        return prev;
+      });
     } catch (err) {
       console.error(err);
     }
-  }, [id, logs]);
+  }, [id]);
 
   useEffect(() => {
     let ws: WebSocket | null = null;
@@ -157,7 +163,10 @@ export default function ProjectPage() {
     let pollInterval: NodeJS.Timeout;
 
     const connect = () => {
-      if (ws) ws.close();
+      if (ws) {
+        ws.onclose = null; // Prevent recursion
+        ws.close();
+      }
       ws = new WebSocket(getWsUrl());
       ws.onopen = () => {
         setWsConnected(true);
@@ -165,7 +174,6 @@ export default function ProjectPage() {
       };
       ws.onclose = () => {
         setWsConnected(false);
-        // Start polling fallback if WS is down
         if (!pollInterval) {
           pollInterval = setInterval(fetchProject, 5000);
         }
@@ -188,7 +196,10 @@ export default function ProjectPage() {
     connect();
 
     return () => {
-      if (ws) ws.close();
+      if (ws) {
+        ws.onclose = null;
+        ws.close();
+      }
       clearTimeout(reconnectTimeout);
       if (pollInterval) clearInterval(pollInterval);
     };

@@ -12,26 +12,33 @@ import (
 
 const (
 	pingPeriod = 30 * time.Second
+	writeWait  = 10 * time.Second
 )
 
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool { return true },
 }
 
+type Client struct {
+	hub  *Hub
+	conn *websocket.Conn
+	send chan []byte
+}
+
 type Hub struct {
-	clients    map[*websocket.Conn]bool
+	clients    map[*Client]bool
 	broadcast  chan []byte
-	register   chan *websocket.Conn
-	unregister chan *websocket.Conn
+	register   chan *Client
+	unregister chan *Client
 	mu         sync.Mutex
 }
 
 func newHub() *Hub {
 	return &Hub{
 		broadcast:  make(chan []byte),
-		register:   make(chan *websocket.Conn),
-		unregister: make(chan *websocket.Conn),
-		clients:    make(map[*websocket.Conn]bool),
+		register:   make(chan *Client),
+		unregister: make(chan *Client),
+		clients:    make(map[*Client]bool),
 	}
 }
 
@@ -49,15 +56,16 @@ func (h *Hub) run() {
 			h.mu.Lock()
 			if _, ok := h.clients[client]; ok {
 				delete(h.clients, client)
-				client.Close()
+				close(client.send)
 			}
 			h.mu.Unlock()
 		case message := <-h.broadcast:
 			h.mu.Lock()
 			for client := range h.clients {
-				err := client.WriteMessage(websocket.TextMessage, message)
-				if err != nil {
-					client.Close()
+				select {
+				case client.send <- message:
+				default:
+					close(client.send)
 					delete(h.clients, client)
 				}
 			}
@@ -65,12 +73,57 @@ func (h *Hub) run() {
 		case <-ticker.C:
 			h.mu.Lock()
 			for client := range h.clients {
-				if err := client.WriteMessage(websocket.PingMessage, nil); err != nil {
-					client.Close()
+				// Ping message is sent via the writePump
+				select {
+				case client.send <- nil: // Signal a ping
+				default:
+					close(client.send)
 					delete(h.clients, client)
 				}
 			}
 			h.mu.Unlock()
+		}
+	}
+}
+
+func (c *Client) writePump() {
+	ticker := time.NewTicker(pingPeriod)
+	defer func() {
+		ticker.Stop()
+		c.conn.Close()
+	}()
+	for {
+		select {
+		case message, ok := <-c.send:
+			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+			if !ok {
+				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
+				return
+			}
+
+			if message == nil {
+				if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+					return
+				}
+				continue
+			}
+
+			if err := c.conn.WriteMessage(websocket.TextMessage, message); err != nil {
+				return
+			}
+		}
+	}
+}
+
+func (c *Client) readPump() {
+	defer func() {
+		c.hub.unregister <- c
+		c.conn.Close()
+	}()
+	for {
+		_, _, err := c.conn.ReadMessage()
+		if err != nil {
+			break
 		}
 	}
 }
@@ -100,15 +153,9 @@ func serveWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
 		fmt.Printf("Error upgrading to websocket: %v\n", err)
 		return
 	}
-	hub.register <- conn
+	client := &Client{hub: hub, conn: conn, send: make(chan []byte, 256)}
+	client.hub.register <- client
 
-	go func() {
-		defer func() { hub.unregister <- conn }()
-		for {
-			// Read loop is required to handle pong responses and detect disconnects
-			if _, _, err := conn.ReadMessage(); err != nil {
-				break
-			}
-		}
-	}()
+	go client.writePump()
+	go client.readPump()
 }
