@@ -72,8 +72,11 @@ func main() {
 		public.POST("/webhooks/:id/:provider", func(c *gin.Context) {
 			id := c.Param("id")
 			provider := c.Param("provider")
+			fmt.Printf("Webhook received: ID=%s, Provider=%s\n", id, provider)
+
 			var project models.Project
 			if err := db.Preload("EnvVars").First(&project, id).Error; err != nil {
+				fmt.Printf("Webhook error: Project %s not found\n", id)
 				c.JSON(404, gin.H{"error": "Project not found"})
 				return
 			}
@@ -85,16 +88,21 @@ func main() {
 				}
 				if err := c.ShouldBindJSON(&payload); err == nil {
 					branch := strings.TrimPrefix(payload.Ref, "refs/heads/")
+					fmt.Printf("Webhook payload: branch=%s, target_branch=%s\n", branch, project.WebhookBranch)
 					if branch == project.WebhookBranch || project.WebhookBranch == "" {
 						trigger = true
 					}
+				} else {
+					fmt.Printf("Webhook error: failed to bind JSON: %v\n", err)
 				}
 			}
 
 			if trigger {
+				fmt.Printf("Webhook success: triggering deployment for project %d\n", project.ID)
 				c.JSON(202, gin.H{"message": "Deployment triggered"})
 				go handleDeploy(context.Background(), db, orch, hub, project)
 			} else {
+				fmt.Printf("Webhook skipped: no action for project %d\n", project.ID)
 				c.JSON(200, gin.H{"message": "No action taken"})
 			}
 		})
