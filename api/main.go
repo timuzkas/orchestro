@@ -654,6 +654,8 @@ func handleDeploy(ctx context.Context, db *gorm.DB, orch *orchestrator.DockerOrc
 			dockerfileContent := fmt.Sprintf(`
 FROM %s
 WORKDIR /app
+ENV NODE_ENV=production
+ENV HOST=0.0.0.0
 %s
 %s
 RUN %s

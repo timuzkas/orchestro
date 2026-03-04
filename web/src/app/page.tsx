@@ -103,6 +103,13 @@ export default function Home() {
       build_command: "",
       start_command: "python main.py",
     },
+    svelte: {
+      name: "SvelteKit (Bun)",
+      base_image: "oven/bun:latest",
+      install_command: "bun install",
+      build_command: "bun run build",
+      start_command: "bun run start",
+    },
   };
 
   const handleStackChange = (stackKey: string) => {
