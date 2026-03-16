@@ -13,10 +13,15 @@ import {
   RefreshCw,
   Archive,
   X,
-  Pause,
-  Play,
   Package,
+  Plus,
+  Trash2,
+  Box,
+  Layers,
   ChevronDown,
+  Monitor,
+  Pause,
+  Play
 } from "lucide-react";
 import Link from "next/link";
 import { apiFetch, getWsUrl, API_URL } from "@/lib/api";
@@ -90,6 +95,7 @@ interface Project {
   internal_port: number;
   docker_compose: string;
   custom_dockerfile: string;
+  deployment_type: 'standard' | 'docker-compose';
   webhook_secret: string;
   git_provider: string;
   webhook_branch: string;
@@ -512,12 +518,20 @@ export default function ProjectPage() {
                       <span className="text-zinc-300">{project.branch}</span>
                     </div>
                     <div className="flex flex-col sm:flex-row sm:justify-between border-b border-zinc-900 pb-4 gap-2">
-                      <span className="text-zinc-500 shrink-0">Build Command</span>
-                      {project.build_command ? <code className="bg-black px-2 py-1 rounded text-zinc-400 text-xs sm:text-sm break-all">{project.build_command}</code> : <span className="text-zinc-600 italic text-sm">No build step required</span>}
+                      <span className="text-zinc-500 shrink-0">Build Strategy</span>
+                      {project.deployment_type === 'docker-compose' ? (
+                        <span className="text-blue-400 font-bold flex items-center gap-1"><Layers size={14} /> Docker Compose</span>
+                      ) : (
+                        project.build_command ? <code className="bg-black px-2 py-1 rounded text-zinc-400 text-xs sm:text-sm break-all">{project.build_command}</code> : <span className="text-zinc-600 italic text-sm">No build step required</span>
+                      )}
                     </div>
                     <div className="flex flex-col sm:flex-row sm:justify-between border-b border-zinc-900 pb-4 gap-2">
                       <span className="text-zinc-500 shrink-0">Start Command</span>
-                      <code className="bg-black px-2 py-1 rounded text-zinc-400 text-xs sm:text-sm break-all">{project.start_command || "bun run start"}</code>
+                      {project.deployment_type === 'docker-compose' ? (
+                        <span className="text-zinc-600 italic text-sm">Managed via compose up</span>
+                      ) : (
+                        <code className="bg-black px-2 py-1 rounded text-zinc-400 text-xs sm:text-sm break-all">{project.start_command || "bun run start"}</code>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -612,9 +626,28 @@ export default function ProjectPage() {
                   </div>
                 </div>
                 <div className="bg-zinc-950 border border-zinc-900 rounded-3xl p-6 flex flex-col h-[400px] md:col-span-2 lg:col-span-1">
-                  <div className="flex items-center gap-2 mb-6"><FileCode size={18} className="text-zinc-500" /><h3 className="text-lg font-serif">Custom Dockerfile</h3></div>
+                  <div className="flex items-center gap-2 mb-6">
+                    <FileCode size={18} className="text-zinc-500" />
+                    <h3 className="text-lg font-serif">
+                      {project.deployment_type === 'docker-compose' ? "docker-compose.yml" : "Custom Dockerfile"}
+                    </h3>
+                  </div>
                   <div className="relative flex-1 group">
-                    <textarea value={project.custom_dockerfile || ""} onChange={(e) => setProject({ ...project, custom_dockerfile: e.target.value })} className="w-full h-full bg-black border border-zinc-900 rounded-2xl p-4 font-mono text-[10px] text-zinc-500 focus:outline-none focus:border-zinc-700 resize-none scrollbar-hide transition-colors" placeholder="Override auto-generated Dockerfile. Leave empty to use default..." />
+                    {project.deployment_type === 'docker-compose' ? (
+                      <textarea 
+                        value={project.docker_compose || ""} 
+                        onChange={(e) => setProject({ ...project, docker_compose: e.target.value })} 
+                        className="w-full h-full bg-black border border-zinc-900 rounded-2xl p-4 font-mono text-[10px] text-zinc-300 focus:outline-none focus:border-zinc-700 resize-none scrollbar-hide transition-colors" 
+                        placeholder="services:&#10;  app:&#10;    image: my-image&#10;    ports:&#10;      - '80:80'" 
+                      />
+                    ) : (
+                      <textarea 
+                        value={project.custom_dockerfile || ""} 
+                        onChange={(e) => setProject({ ...project, custom_dockerfile: e.target.value })} 
+                        className="w-full h-full bg-black border border-zinc-900 rounded-2xl p-4 font-mono text-[10px] text-zinc-500 focus:outline-none focus:border-zinc-700 resize-none scrollbar-hide transition-colors" 
+                        placeholder="Override auto-generated Dockerfile. Leave empty to use default..." 
+                      />
+                    )}
                     <div className="absolute bottom-4 right-4"><button onClick={() => handleUpdateProject()} disabled={isSaving} className="bg-white text-black px-4 py-2 rounded-xl text-[10px] uppercase font-bold hover:bg-zinc-200 transition-all active:scale-95 disabled:opacity-50">{isSaving ? "Saving..." : "Save Config"}</button></div>
                   </div>
                 </div>
@@ -667,15 +700,42 @@ export default function ProjectPage() {
           {activeTab === "settings" && (
             <div className="space-y-12 pb-20 animate-modal-enter">
               <div className="bg-zinc-950 border border-zinc-900 rounded-3xl p-6 sm:p-8 max-w-3xl">
-                                <div className="flex items-center gap-3 mb-8">
-                                  <Github size={20} className="text-zinc-500" />
-                                  <div>
-                                    <h3 className="text-xl font-serif">Source Configuration</h3>
-                                    <p className="text-xs text-zinc-500">
-                                      Repository and workspace settings.
-                                    </p>
-                                  </div>
-                                </div>
+                <div className="flex items-center gap-3 mb-8">
+                  <Box size={20} className="text-zinc-500" />
+                  <div>
+                    <h3 className="text-xl font-serif">Deployment Strategy</h3>
+                    <p className="text-xs text-zinc-500">
+                      Choose how your project is built and deployed.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex bg-black border border-zinc-900 rounded-2xl p-1 mb-8">
+                  <button 
+                    type="button" 
+                    onClick={() => setProject({ ...project, deployment_type: 'standard' })}
+                    className={`flex-1 py-2 rounded-xl text-[10px] uppercase font-bold tracking-widest transition-all ${project.deployment_type === 'standard' ? 'bg-zinc-900 text-white shadow-lg' : 'text-zinc-500 hover:text-zinc-400'}`}
+                  >
+                    Standard Build
+                  </button>
+                  <button 
+                    type="button" 
+                    onClick={() => setProject({ ...project, deployment_type: 'docker-compose' })}
+                    className={`flex-1 py-2 rounded-xl text-[10px] uppercase font-bold tracking-widest transition-all ${project.deployment_type === 'docker-compose' ? 'bg-zinc-900 text-white shadow-lg' : 'text-zinc-500 hover:text-zinc-400'}`}
+                  >
+                    Docker Compose
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-3 mb-8">
+                  <Github size={20} className="text-zinc-500" />
+                  <div>
+                    <h3 className="text-xl font-serif">Source Configuration</h3>
+                    <p className="text-xs text-zinc-500">
+                      Repository and workspace settings.
+                    </p>
+                  </div>
+                </div>
                 
                 <form onSubmit={handleUpdateProject} className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -822,3 +882,4 @@ export default function ProjectPage() {
     </div>
   );
 }
+

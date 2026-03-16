@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Plus, ExternalLink, Package, X, Settings, RefreshCw, ChevronDown } from "lucide-react";
+import { Plus, ExternalLink, Package, X, Settings, RefreshCw, ChevronDown, Box, Layers } from "lucide-react";
 import Link from "next/link";
 import { apiFetch, getWsUrl } from "@/lib/api";
 
@@ -44,6 +44,8 @@ interface Project {
   branch: string;
   deployments?: Deployment[];
   live_state?: string;
+  deployment_type: 'standard' | 'docker-compose';
+  docker_compose?: string;
 }
 
 interface Stats {
@@ -70,7 +72,9 @@ export default function Home() {
     root_directory: "",
     start_command: "bun run start",
     custom_port: 0,
-    internal_port: 0
+    internal_port: 0,
+    deployment_type: 'standard' as 'standard' | 'docker-compose',
+    docker_compose: ""
   });
   const [showAdvanced, setShowAdvanced] = useState(false);
 
@@ -205,7 +209,9 @@ export default function Home() {
           root_directory: "",
           start_command: "bun run start",
           custom_port: 0,
-          internal_port: 0
+          internal_port: 0,
+          deployment_type: 'standard',
+          docker_compose: ""
         });
         fetchProjects();
       } else {
@@ -337,7 +343,18 @@ export default function Home() {
                     className="bg-zinc-950 border border-zinc-900 rounded-3xl p-6 hover:border-zinc-700 transition-all group animate-float-up opacity-0"
                   >
                     <div className="flex justify-between items-start mb-4">
-                      <h3 className="text-2xl font-serif">{project.name}</h3>
+                      <div className="flex items-center gap-3">
+                        {project.deployment_type === 'docker-compose' ? (
+                          <div className="p-2 bg-blue-500/10 rounded-xl text-blue-500">
+                            <Layers size={18} />
+                          </div>
+                        ) : (
+                          <div className="p-2 bg-white/5 rounded-xl text-zinc-400">
+                            <Box size={18} />
+                          </div>
+                        )}
+                        <h3 className="text-2xl font-serif">{project.name}</h3>
+                      </div>
                       <div className="flex gap-2">
                         <button 
                           onClick={() => handleDeploy(project.id)}
@@ -452,6 +469,23 @@ export default function Home() {
             </div>
 
             <form onSubmit={handleCreateProject} className="space-y-6">
+              <div className="flex bg-black border border-zinc-900 rounded-2xl p-1 mb-2">
+                <button 
+                  type="button" 
+                  onClick={() => setNewProject({ ...newProject, deployment_type: 'standard' })}
+                  className={`flex-1 py-2 rounded-xl text-[10px] uppercase font-bold tracking-widest transition-all ${newProject.deployment_type === 'standard' ? 'bg-zinc-900 text-white shadow-lg' : 'text-zinc-500 hover:text-zinc-400'}`}
+                >
+                  Standard Build
+                </button>
+                <button 
+                  type="button" 
+                  onClick={() => setNewProject({ ...newProject, deployment_type: 'docker-compose' })}
+                  className={`flex-1 py-2 rounded-xl text-[10px] uppercase font-bold tracking-widest transition-all ${newProject.deployment_type === 'docker-compose' ? 'bg-zinc-900 text-white shadow-lg' : 'text-zinc-500 hover:text-zinc-400'}`}
+                >
+                  Docker Compose
+                </button>
+              </div>
+
               <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-1.5">
                   <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold ml-1">Project Name</label>
@@ -477,35 +511,53 @@ export default function Home() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-6">
-                <div className="space-y-1.5">
-                  <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold ml-1">Stack Preset</label>
-                  <div className="relative group">
-                    <select
-                      onChange={(e) => handleStackChange(e.target.value)}
-                      className="w-full bg-black border border-zinc-900 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-white appearance-none transition-colors cursor-pointer pr-10"
-                    >
-                      {Object.entries(STACK_PRESETS).map(([key, preset]) => (
-                        <option key={key} value={key}>{preset.name}</option>
-                      ))}
-                    </select>
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-500 group-focus-within:text-white transition-colors">
-                      <ChevronDown size={16} />
+              {newProject.deployment_type === 'standard' ? (
+                <>
+                  <div className="grid grid-cols-2 gap-6 animate-modal-enter">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold ml-1">Stack Preset</label>
+                      <div className="relative group">
+                        <select
+                          onChange={(e) => handleStackChange(e.target.value)}
+                          className="w-full bg-black border border-zinc-900 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-white appearance-none transition-colors cursor-pointer pr-10"
+                        >
+                          {Object.entries(STACK_PRESETS).map(([key, preset]) => (
+                            <option key={key} value={key}>{preset.name}</option>
+                          ))}
+                        </select>
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-500 group-focus-within:text-white transition-colors">
+                          <ChevronDown size={16} />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold ml-1">Base Image</label>
+                      <input
+                        required={newProject.deployment_type === 'standard'}
+                        type="text"
+                        value={newProject.base_image}
+                        onChange={(e) => setNewProject({ ...newProject, base_image: e.target.value })}
+                        className="w-full bg-black border border-zinc-900 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-white transition-colors"
+                        placeholder="e.g. node:20-alpine"
+                      />
                     </div>
                   </div>
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold ml-1">Base Image</label>
-                  <input
-                    required
-                    type="text"
-                    value={newProject.base_image}
-                    onChange={(e) => setNewProject({ ...newProject, base_image: e.target.value })}
-                    className="w-full bg-black border border-zinc-900 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-white transition-colors"
-                    placeholder="e.g. node:20-alpine"
+                </>
+              ) : (
+                <div className="space-y-1.5 animate-modal-enter">
+                  <div className="flex justify-between items-center ml-1">
+                    <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold">docker-compose.yml</label>
+                    <span className="text-[9px] text-zinc-600">Bypasses build pipeline</span>
+                  </div>
+                  <textarea
+                    required={newProject.deployment_type === 'docker-compose'}
+                    value={newProject.docker_compose}
+                    onChange={(e) => setNewProject({ ...newProject, docker_compose: e.target.value })}
+                    className="w-full h-40 bg-black border border-zinc-900 rounded-xl px-4 py-3 text-xs font-mono focus:outline-none focus:border-white transition-colors resize-none scrollbar-hide"
+                    placeholder="services:&#10;  app:&#10;    image: my-image&#10;    ports:&#10;      - '80:80'"
                   />
                 </div>
-              </div>
+              )}
 
               <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-1.5">
@@ -568,40 +620,44 @@ export default function Home() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-6">
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold ml-1">Install Command</label>
-                        <input
-                          type="text"
-                          value={newProject.install_command}
-                          onChange={(e) => setNewProject({ ...newProject, install_command: e.target.value })}
-                          className="w-full bg-black border border-zinc-900 rounded-xl px-4 py-2.5 text-xs font-mono focus:outline-none focus:border-white transition-colors"
-                          placeholder="e.g. bun install"
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold ml-1">Build Command</label>
-                        <input
-                          type="text"
-                          value={newProject.build_command}
-                          onChange={(e) => setNewProject({ ...newProject, build_command: e.target.value })}
-                          className="w-full bg-black border border-zinc-900 rounded-xl px-4 py-2.5 text-xs font-mono focus:outline-none focus:border-white transition-colors"
-                          placeholder="e.g. bun run build"
-                        />
-                      </div>
-                    </div>
+                    {newProject.deployment_type === 'standard' && (
+                      <>
+                        <div className="grid grid-cols-2 gap-6">
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold ml-1">Install Command</label>
+                            <input
+                              type="text"
+                              value={newProject.install_command}
+                              onChange={(e) => setNewProject({ ...newProject, install_command: e.target.value })}
+                              className="w-full bg-black border border-zinc-900 rounded-xl px-4 py-2.5 text-xs font-mono focus:outline-none focus:border-white transition-colors"
+                              placeholder="e.g. bun install"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold ml-1">Build Command</label>
+                            <input
+                              type="text"
+                              value={newProject.build_command}
+                              onChange={(e) => setNewProject({ ...newProject, build_command: e.target.value })}
+                              className="w-full bg-black border border-zinc-900 rounded-xl px-4 py-2.5 text-xs font-mono focus:outline-none focus:border-white transition-colors"
+                              placeholder="e.g. bun run build"
+                            />
+                          </div>
+                        </div>
 
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold ml-1">Start Command</label>
-                      <input
-                        type="text"
-                        value={newProject.start_command}
-                        onChange={(e) => setNewProject({ ...newProject, start_command: e.target.value })}
-                        className="w-full bg-black border border-zinc-900 rounded-xl px-4 py-2.5 text-xs font-mono focus:outline-none focus:border-white transition-colors"
-                        placeholder="e.g. bun run start"
-                      />
-                      <p className="text-[9px] text-zinc-600 ml-1">The command that launches your server (final step).</p>
-                    </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold ml-1">Start Command</label>
+                          <input
+                            type="text"
+                            value={newProject.start_command}
+                            onChange={(e) => setNewProject({ ...newProject, start_command: e.target.value })}
+                            className="w-full bg-black border border-zinc-900 rounded-xl px-4 py-2.5 text-xs font-mono focus:outline-none focus:border-white transition-colors"
+                            placeholder="e.g. bun run start"
+                          />
+                          <p className="text-[9px] text-zinc-600 ml-1">The command that launches your server (final step).</p>
+                        </div>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
@@ -617,3 +673,5 @@ export default function Home() {
     </div>
   );
 }
+
+
