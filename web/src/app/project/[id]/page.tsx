@@ -14,12 +14,9 @@ import {
   Archive,
   X,
   Package,
-  Plus,
-  Trash2,
   Box,
   Layers,
   ChevronDown,
-  Monitor,
   Pause,
   Play
 } from "lucide-react";
